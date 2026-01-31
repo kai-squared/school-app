@@ -285,6 +285,56 @@ body {
     border-color: #667eea;
 }
 
+.miles-control {
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 12px;
+}
+
+.miles-control label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 12px;
+}
+
+#milesValue {
+    color: #667eea;
+    font-size: 16px;
+}
+
+.miles-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 5px;
+    background: rgba(102, 126, 234, 0.2);
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.miles-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+.miles-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    border: none;
+}
+
 .primary-btn {
     padding: 16px 32px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

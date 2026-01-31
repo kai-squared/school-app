@@ -215,15 +215,35 @@ function setupSearchSection() {
     const exampleChips = document.querySelectorAll('.example-chip');
     const chatSendBtn = document.getElementById('chatSendBtn');
     const chatInput = document.getElementById('chatInput');
+    const milesSlider = document.getElementById('milesSlider');
+    const milesValue = document.getElementById('milesValue');
+    const milesControl = document.getElementById('milesControl');
     
     searchBtn.addEventListener('click', performSearch);
     searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') performSearch();
     });
     
+    // Show/hide miles control based on input
+    searchInput.addEventListener('input', () => {
+        const value = searchInput.value.trim();
+        const isZip = /^\d{1,5}$/.test(value);
+        if (isZip) {
+            milesControl.classList.remove('hidden');
+        } else {
+            milesControl.classList.add('hidden');
+        }
+    });
+    
+    // Update miles value display
+    milesSlider.addEventListener('input', (e) => {
+        milesValue.textContent = e.target.value;
+    });
+    
     exampleChips.forEach(chip => {
         chip.addEventListener('click', () => {
             searchInput.value = chip.textContent;
+            searchInput.dispatchEvent(new Event('input')); // Trigger input event to show/hide miles control
             performSearch();
         });
     });
@@ -250,11 +270,14 @@ async function performSearch() {
     const isZip = /^\d{5}$/.test(query);
     const searchType = isZip ? 'zip' : 'name';
     
+    // Get miles value for ZIP search
+    const miles = isZip ? parseInt(document.getElementById('milesSlider').value) : 10;
+    
     try {
         const response = await fetch(`${API_BASE_URL}/api/schools/search`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, search_type: searchType })
+            body: JSON.stringify({ query, search_type: searchType, miles: miles })
         });
         
         const data = await response.json();
@@ -264,7 +287,7 @@ async function performSearch() {
         }
         
         if (searchType === 'zip') {
-            displaySchoolList(data.schools, query);
+            displaySchoolList(data.schools, query, data.miles || miles);
         } else {
             displaySchoolDetails(data.school);
         }
@@ -278,19 +301,19 @@ async function performSearch() {
     }
 }
 
-function displaySchoolList(schools, zipCode) {
+function displaySchoolList(schools, zipCode, miles) {
     const resultsContainer = document.getElementById('searchResults');
     
     if (schools.length === 0) {
         resultsContainer.innerHTML = `
-            <div class="error">No schools found in ZIP code ${zipCode}. Try a different search.</div>
+            <div class="error">No schools found within ${miles} miles of ZIP code ${zipCode}. Try adjusting the distance or a different ZIP code.</div>
         `;
         return;
     }
     
     const html = `
         <div class="search-results-header">
-            <h3>Top Schools in ZIP ${zipCode}</h3>
+            <h3>Schools within ${miles} miles of ZIP ${zipCode}</h3>
             <p>${schools.length} schools found</p>
         </div>
         ${schools.map(school => createSchoolCard(school, false)).join('')}

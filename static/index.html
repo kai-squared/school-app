@@ -168,8 +168,13 @@
                 
                 <div class="search-container">
                     <div class="search-input-group">
-                        <input type="text" id="schoolSearchInput" placeholder="Enter ZIP code (e.g., 94103) or school name..." class="search-input"/>
+                        <input type="text" id="schoolSearchInput" placeholder="Enter ZIP code (e.g., 30096) or school name..." class="search-input"/>
                         <button id="searchBtn" class="primary-btn">Search Schools</button>
+                    </div>
+                    
+                    <div id="milesControl" class="miles-control hidden">
+                        <label for="milesSlider">Search within: <span id="milesValue">10</span> miles</label>
+                        <input type="range" id="milesSlider" min="5" max="50" value="10" step="5" class="miles-slider"/>
                     </div>
                     
                     <div id="searchResults" class="search-results">

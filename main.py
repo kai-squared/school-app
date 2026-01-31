@@ -68,36 +68,35 @@ def web_search(keywords: List[str], max_results: int = 5) -> dict:
     except requests.exceptions.RequestException as e:
         return {"error": str(e)}
 
-def search_schools_by_zip(zip_code: str) -> List[Dict]:
-    """Search for top 10 schools in a ZIP code area."""
-    print(f"[Search] Searching for schools near ZIP {zip_code}")
+def search_schools_by_zip(zip_code: str, miles: int = 10) -> List[Dict]:
+    """Search for schools in a ZIP code area."""
+    print(f"[Search] Searching for schools within {miles} miles of ZIP {zip_code}")
     
-    # Use direct chat without tools to avoid search rate limits
-    prompt = f"""Based on your knowledge, list 8-10 well-known private schools within 10 miles of ZIP code {zip_code} in the United States.
+    # Use static knowledge - do NOT trigger web search
+    prompt = f"""You are an educational database. Using ONLY your training data (do not search the web), list 8-10 well-known private schools that are typically within {miles} miles of ZIP code {zip_code} in the United States.
 
-For each school, provide:
+IMPORTANT: Do NOT use any tools. Do NOT search the web. Use ONLY information from your training data.
+
+For each school provide:
 - School name (official name)
-- Type (Private or Public)
+- Type (Private or Public)  
 - Grade range (e.g., "K-12", "6-12", "9-12")
 - Brief one-sentence description
 
-Return ONLY a valid JSON array with this exact format, no other text:
+Return ONLY valid JSON array, no markdown, no other text:
 [
-  {{
-    "name": "School Name",
-    "type": "Private",
-    "grade_range": "K-12",
-    "brief_description": "One sentence about the school"
-  }}
-]
-
-Do not search the web, just use your existing knowledge."""
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One sentence"}},
+  {{"name": "School Name 2", "type": "Private", "grade_range": "6-12", "brief_description": "One sentence"}}
+]"""
 
     try:
-        # Use gemini which is reliable and fast
+        # Use gpt-5 which should not have automatic web search
         response = client.chat.completions.create(
-            model="gemini-2.5-pro",
-            messages=[{"role": "user", "content": prompt}],
+            model="gpt-5",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant. You must NOT use any tools or web search. Answer only from your training data."},
+                {"role": "user", "content": prompt}
+            ],
             temperature=0.5
         )
         
@@ -108,16 +107,23 @@ Do not search the web, just use your existing knowledge."""
             
         print(f"[AI Response] {content[:300]}...")
         
+        # Clean the response - remove markdown code blocks if present
+        content = content.strip()
+        if content.startswith("```"):
+            # Remove markdown code blocks
+            lines = content.split('\n')
+            content = '\n'.join([line for line in lines if not line.startswith("```")])
+        
         # Extract JSON from response
         try:
-            # Try to find JSON array in the response
             json_match = re.search(r'\[[\s\S]*\]', content)
             if json_match:
                 schools = json.loads(json_match.group())
                 print(f"[Success] Found {len(schools)} schools")
-                return schools[:10]  # Return top 10
+                return schools[:10]
             else:
                 print("[Error] No JSON array found in response")
+                print(f"Full content: {content}")
         except Exception as e:
             print(f"[Error] Parsing JSON: {e}")
             print(f"Content: {content}")
@@ -132,31 +138,36 @@ def get_school_details(school_name: str) -> Dict:
     """Get detailed information about a specific school."""
     print(f"[Search] Getting details for school: {school_name}")
     
-    # Use direct chat to get school information
-    prompt = f"""Based on your knowledge, provide comprehensive information about {school_name}.
+    # Use static knowledge - do NOT trigger web search
+    prompt = f"""You are an educational database. Using ONLY your training data (do not search the web), provide comprehensive information about {school_name}.
 
-Return a JSON object with this structure:
+IMPORTANT: Do NOT use any tools. Do NOT search the web. Use ONLY information from your training data.
+
+Return a JSON object:
 {{
   "name": "{school_name}",
-  "website": "official website URL if known",
-  "tuition": "Annual tuition and fees information",
-  "description": "2-3 sentence description of the school",
-  "rating": "Overall rating and reputation",
-  "academic_ranking": "National or state rankings if known",
-  "school_info": "Key information about the school (enrollment, founded year, campus)",
-  "community": "Community and location information",
-  "college_placement": "College matriculation information",
-  "core_values": "Mission statement and core values",
-  "grade_range": "Grade levels served",
+  "website": "official website URL if you know it",
+  "tuition": "Annual tuition range (e.g., $40,000-$50,000)",
+  "description": "2-3 sentence description",
+  "rating": "Reputation information",
+  "academic_ranking": "Rankings if known",
+  "school_info": "Key facts (enrollment, founded, campus size)",
+  "community": "Location and community info",
+  "college_placement": "College matriculation info",
+  "core_values": "Mission and values",
+  "grade_range": "Grades served",
   "type": "Private or Public"
 }}
 
-Return valid JSON only, no other text. Do not search the web, use your existing knowledge."""
+Return valid JSON only, no markdown."""
 
     try:
         response = client.chat.completions.create(
-            model="gemini-2.5-pro",
-            messages=[{"role": "user", "content": prompt}],
+            model="gpt-5",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant. You must NOT use any tools or web search. Answer only from your training data."},
+                {"role": "user", "content": prompt}
+            ],
             temperature=0.5
         )
         
@@ -167,8 +178,13 @@ Return valid JSON only, no other text. Do not search the web, use your existing 
             
         print(f"[AI Response] {content[:300]}...")
         
+        # Clean the response
+        content = content.strip()
+        if content.startswith("```"):
+            lines = content.split('\n')
+            content = '\n'.join([line for line in lines if not line.startswith("```")])
+        
         try:
-            # Extract JSON from response
             json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
                 details = json.loads(json_match.group())
@@ -176,6 +192,7 @@ Return valid JSON only, no other text. Do not search the web, use your existing 
                 return details
             else:
                 print("[Error] No JSON object found in response")
+                print(f"Full content: {content}")
         except Exception as e:
             print(f"[Error] Parsing JSON: {e}")
             print(f"Content: {content}")
@@ -191,6 +208,7 @@ Return valid JSON only, no other text. Do not search the web, use your existing 
 class SchoolSearchRequest(BaseModel):
     query: str
     search_type: str  # "zip" or "name"
+    miles: Optional[int] = 10  # default 10 miles for ZIP search
 
 class SchoolDetailsRequest(BaseModel):
     school_name: str
@@ -228,11 +246,20 @@ async def search_schools(request: SchoolSearchRequest):
     """Search for schools by ZIP code or name."""
     try:
         if request.search_type == "zip":
-            schools = search_schools_by_zip(request.query)
+            # Validate ZIP code format
+            if not re.match(r'^\d{5}$', request.query):
+                return {
+                    "success": False,
+                    "error": "Invalid ZIP code. Please enter a 5-digit US ZIP code."
+                }
+            
+            miles = request.miles if request.miles else 10
+            schools = search_schools_by_zip(request.query, miles)
             return {
                 "success": True,
                 "search_type": "zip",
                 "query": request.query,
+                "miles": miles,
                 "schools": schools
             }
         else:  # search by name
