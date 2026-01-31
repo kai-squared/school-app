@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Chat</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Chat History</h2>
+                <button id="newChatBtn" class="new-chat-btn">+ New Chat</button>
+            </div>
+            <div id="chatHistory" class="chat-history">
+                <!-- Chat history items will be added here -->
+            </div>
+        </div>
+        
+        <div class="main-chat">
+            <div class="chat-header">
+                <h1>AI Agent with Web Search</h1>
+                <p class="subtitle">Ask me anything - I can search the web and read pages!</p>
+            </div>
+            
+            <div id="chatMessages" class="chat-messages">
+                <div class="welcome-message">
+                    <h2>👋 Welcome!</h2>
+                    <p>I'm an AI agent with access to:</p>
+                    <ul>
+                        <li>🔍 Web search capabilities</li>
+                        <li>📄 Page reading tools</li>
+                        <li>🤔 Multi-step reasoning</li>
+                    </ul>
+                    <p>Try asking me something like:</p>
+                    <div class="example-queries">
+                        <button class="example-query">Who won the Super Bowl?</button>
+                        <button class="example-query">What's the weather in Paris?</button>
+                        <button class="example-query">Latest Python release features</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <textarea 
+                    id="messageInput" 
+                    placeholder="Ask me anything..." 
+                    rows="1"
+                ></textarea>
+                <button id="sendBtn" class="send-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/app.js"></script>
+</body>
+</html>
