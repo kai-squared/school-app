@@ -32,16 +32,16 @@ app.add_middleware(
 # Mount static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# API configuration
+# Use AI_BUILDER_TOKEN in deployment, SUPER_MIND_API_KEY for local development
+API_KEY = os.getenv("AI_BUILDER_TOKEN") or os.getenv("SUPER_MIND_API_KEY")
+SEARCH_API_URL = "https://space.ai-builders.com/backend/v1/search/"
+
 # Initialize OpenAI client with custom base URL
 client = OpenAI(
     api_key=API_KEY,
     base_url="https://space.ai-builders.com/backend/v1"
 )
-
-# API configuration
-# Use AI_BUILDER_TOKEN in deployment, SUPER_MIND_API_KEY for local development
-API_KEY = os.getenv("AI_BUILDER_TOKEN") or os.getenv("SUPER_MIND_API_KEY")
-SEARCH_API_URL = "https://space.ai-builders.com/backend/v1/search/"
 
 
 # Web search function
