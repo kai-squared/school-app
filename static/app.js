@@ -218,21 +218,26 @@ function setupSearchSection() {
     const milesSlider = document.getElementById('milesSlider');
     const milesValue = document.getElementById('milesValue');
     const milesControl = document.getElementById('milesControl');
+    const searchTypeRadios = document.querySelectorAll('input[name="searchType"]');
     
     searchBtn.addEventListener('click', performSearch);
     searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') performSearch();
     });
     
+    // Handle search type changes
+    searchTypeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const type = e.target.value;
+            updatePlaceholder(type);
+            updateMilesControlVisibility(type, searchInput.value);
+        });
+    });
+    
     // Show/hide miles control based on input
     searchInput.addEventListener('input', () => {
-        const value = searchInput.value.trim();
-        const isZip = /^\d{1,5}$/.test(value);
-        if (isZip) {
-            milesControl.classList.remove('hidden');
-        } else {
-            milesControl.classList.add('hidden');
-        }
+        const selectedType = document.querySelector('input[name="searchType"]:checked').value;
+        updateMilesControlVisibility(selectedType, searchInput.value);
     });
     
     // Update miles value display
@@ -243,7 +248,14 @@ function setupSearchSection() {
     exampleChips.forEach(chip => {
         chip.addEventListener('click', () => {
             searchInput.value = chip.textContent;
-            searchInput.dispatchEvent(new Event('input')); // Trigger input event to show/hide miles control
+            // Auto-select search type based on example
+            if (/^\d{5}$/.test(chip.textContent)) {
+                document.querySelector('input[name="searchType"][value="zip"]').checked = true;
+            } else {
+                document.querySelector('input[name="searchType"][value="name"]').checked = true;
+            }
+            updatePlaceholder(document.querySelector('input[name="searchType"]:checked').value);
+            searchInput.dispatchEvent(new Event('input'));
             performSearch();
         });
     });
@@ -257,6 +269,28 @@ function setupSearchSection() {
     });
 }
 
+function updatePlaceholder(searchType) {
+    const searchInput = document.getElementById('schoolSearchInput');
+    const placeholders = {
+        zip: 'Enter ZIP code (e.g., 30096)',
+        city: 'Enter city name (e.g., Atlanta)',
+        state: 'Enter state name (e.g., Georgia)',
+        name: 'Enter school name (e.g., Phillips Academy)'
+    };
+    searchInput.placeholder = placeholders[searchType] || 'Enter search query';
+}
+
+function updateMilesControlVisibility(searchType, value) {
+    const milesControl = document.getElementById('milesControl');
+    // Show miles control for ZIP or city searches with valid input
+    if ((searchType === 'zip' && /^\d{1,5}$/.test(value)) || 
+        (searchType === 'city' && value.trim().length > 0)) {
+        milesControl.classList.remove('hidden');
+    } else {
+        milesControl.classList.add('hidden');
+    }
+}
+
 async function performSearch() {
     const searchInput = document.getElementById('schoolSearchInput');
     const query = searchInput.value.trim();
@@ -266,12 +300,12 @@ async function performSearch() {
     const resultsContainer = document.getElementById('searchResults');
     resultsContainer.innerHTML = '<div class="loading">🔍 Searching for schools...</div>';
     
-    // Determine search type
-    const isZip = /^\d{5}$/.test(query);
-    const searchType = isZip ? 'zip' : 'name';
+    // Get selected search type
+    const searchType = document.querySelector('input[name="searchType"]:checked').value;
     
-    // Get miles value for ZIP search
-    const miles = isZip ? parseInt(document.getElementById('milesSlider').value) : 10;
+    // Get miles value for ZIP/city search
+    const miles = (searchType === 'zip' || searchType === 'city') ? 
+        parseInt(document.getElementById('milesSlider').value) : 10;
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/schools/search`, {
@@ -286,10 +320,17 @@ async function performSearch() {
             throw new Error(data.error || 'Search failed');
         }
         
-        if (searchType === 'zip') {
-            displaySchoolList(data.schools, query, data.miles || miles);
-        } else {
+        if (searchType === 'name') {
             displaySchoolDetails(data.school);
+        } else {
+            // ZIP, city, or state search - display list
+            const displayMiles = data.miles || miles;
+            const locationText = searchType === 'zip' ? `ZIP ${query}` : 
+                               searchType === 'city' ? `${query}` : 
+                               `${query} state`;
+            const distanceText = (searchType === 'zip' || searchType === 'city') ? 
+                               ` within ${displayMiles} miles` : '';
+            displaySchoolList(data.schools, locationText, distanceText);
         }
         
         // Show chat section
@@ -301,19 +342,19 @@ async function performSearch() {
     }
 }
 
-function displaySchoolList(schools, zipCode, miles) {
+function displaySchoolList(schools, location, distanceText) {
     const resultsContainer = document.getElementById('searchResults');
     
     if (schools.length === 0) {
         resultsContainer.innerHTML = `
-            <div class="error">No schools found within ${miles} miles of ZIP code ${zipCode}. Try adjusting the distance or a different ZIP code.</div>
+            <div class="error">No schools found in ${location}${distanceText}. Try adjusting your search.</div>
         `;
         return;
     }
     
     const html = `
         <div class="search-results-header">
-            <h3>Schools within ${miles} miles of ZIP ${zipCode}</h3>
+            <h3>Schools in ${location}${distanceText}</h3>
             <p>${schools.length} schools found</p>
         </div>
         ${schools.map(school => createSchoolCard(school, false)).join('')}
@@ -366,6 +407,9 @@ async function loadSchoolDetails(schoolName) {
     const schoolCard = document.querySelector(`[data-school-name="${schoolName}"]`);
     if (!schoolCard) return;
     
+    // Disable transitions temporarily
+    schoolCard.style.transition = 'none';
+    
     // Show loading state
     const originalHTML = schoolCard.innerHTML;
     schoolCard.innerHTML = '<div class="loading" style="padding: 40px; text-align: center;">📚 Loading detailed information...</div>';
@@ -383,15 +427,34 @@ async function loadSchoolDetails(schoolName) {
             throw new Error(data.error || 'Failed to load details');
         }
         
-        // Replace the entire card with detailed version
-        const detailedCard = createSchoolCard(data.school, true);
-        schoolCard.outerHTML = detailedCard;
+        // Create a new card element
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = createSchoolCard(data.school, true);
+        const newCard = tempDiv.firstElementChild;
+        
+        // Disable transition on new card too
+        newCard.style.transition = 'none';
+        
+        // Replace the card
+        schoolCard.parentNode.replaceChild(newCard, schoolCard);
+        
+        // Force reflow
+        newCard.offsetHeight;
+        
+        // Re-enable transitions after a brief delay
+        setTimeout(() => {
+            newCard.style.transition = '';
+        }, 50);
         
         // Update search context
         state.searchContext = JSON.stringify(data.school);
         
     } catch (error) {
         schoolCard.innerHTML = originalHTML + `<div class="error" style="margin-top: 12px;">Error loading details: ${error.message}</div>`;
+        // Re-enable transitions
+        setTimeout(() => {
+            schoolCard.style.transition = '';
+        }, 50);
     }
 }
 

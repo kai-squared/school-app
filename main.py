@@ -146,6 +146,79 @@ Return valid JSON only."""
     
     return []
 
+
+def search_schools_by_location(location: str, location_type: str = "city") -> List[Dict]:
+    """Search for schools by city or state."""
+    print(f"[Search] Searching for schools in {location_type}: {location}")
+    
+    search_query = f"private schools in {location}" if location_type == "city" else f"top private schools in {location} state"
+    
+    # Try web search first
+    search_results = None
+    try:
+        search_results = web_search([search_query], max_results=6)
+        if search_results and search_results.get('queries'):
+            print(f"[Web Search] Got {len(search_results.get('queries', []))} query results")
+    except Exception as e:
+        print(f"[Web Search] Failed: {e}")
+    
+    # Build prompt
+    if search_results and search_results.get('queries'):
+        prompt = f"""Based on these search results, extract a list of private schools in {location}.
+
+Search results:
+{json.dumps(search_results, indent=2)}
+
+Return a JSON array with 8-12 schools:
+[
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One sentence"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "brief_description": "One sentence"}}
+]
+
+Return valid JSON only."""
+    else:
+        # Fallback to AI knowledge
+        prompt = f"""Using your training data, list 8-12 well-known private schools in {location}.
+
+Return a JSON array:
+[
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One sentence about the school"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "brief_description": "One sentence"}}
+]
+
+Return valid JSON only."""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-5",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant. Provide school information."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.5
+        )
+        
+        content = response.choices[0].message.content
+        if not content:
+            return []
+            
+        # Clean and extract JSON
+        content = content.strip()
+        if content.startswith("```"):
+            lines = content.split('\n')
+            content = '\n'.join([line for line in lines if not line.startswith("```")])
+        
+        json_match = re.search(r'\[[\s\S]*\]', content)
+        if json_match:
+            schools = json.loads(json_match.group())
+            print(f"[Success] Found {len(schools)} schools in {location}")
+            return schools[:12]
+            
+    except Exception as e:
+        print(f"[Error] Search failed: {e}")
+    
+    return []
+
 def get_school_details(school_name: str) -> Dict:
     """Get detailed school information - tries web search first, falls back to AI knowledge."""
     print(f"[Deep Search] Getting comprehensive details for: {school_name}")
@@ -252,8 +325,8 @@ Be specific where possible. Return valid JSON only."""
 
 class SchoolSearchRequest(BaseModel):
     query: str
-    search_type: str  # "zip" or "name"
-    miles: Optional[int] = 10  # default 10 miles for ZIP search
+    search_type: str  # "zip", "city", "state", or "name"
+    miles: Optional[int] = 10  # default 10 miles for ZIP/city search
 
 class SchoolDetailsRequest(BaseModel):
     school_name: str
@@ -288,7 +361,7 @@ async def root():
 
 @app.post("/api/schools/search")
 async def search_schools(request: SchoolSearchRequest):
-    """Search for schools by ZIP code or name."""
+    """Search for schools by ZIP code, city, state, or name."""
     try:
         if request.search_type == "zip":
             # Validate ZIP code format
@@ -305,6 +378,14 @@ async def search_schools(request: SchoolSearchRequest):
                 "search_type": "zip",
                 "query": request.query,
                 "miles": miles,
+                "schools": schools
+            }
+        elif request.search_type in ["city", "state"]:
+            schools = search_schools_by_location(request.query, request.search_type)
+            return {
+                "success": True,
+                "search_type": request.search_type,
+                "query": request.query,
                 "schools": schools
             }
         else:  # search by name

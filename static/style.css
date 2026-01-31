@@ -265,6 +265,49 @@ body {
     flex: 1;
 }
 
+.search-type-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding: 8px;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 12px;
+    flex-wrap: wrap;
+}
+
+.search-type-selector label {
+    flex: 1;
+    min-width: 100px;
+    cursor: pointer;
+}
+
+.search-type-selector input[type="radio"] {
+    display: none;
+}
+
+.search-type-selector span {
+    display: block;
+    padding: 10px 16px;
+    text-align: center;
+    background: white;
+    border: 2px solid rgba(102, 126, 234, 0.2);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #667eea;
+    transition: all 0.2s;
+}
+
+.search-type-selector input[type="radio"]:checked + span {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+}
+
+.search-type-selector label:hover span {
+    border-color: #667eea;
+}
+
 .search-input-group {
     display: flex;
     gap: 12px;
