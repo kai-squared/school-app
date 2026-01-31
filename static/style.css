@@ -955,12 +955,14 @@ body {
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 16px;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
+    will-change: transform;
 }
 
 .school-card:hover {
     border-color: #667eea;
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    transform: translateY(-2px);
 }
 
 .school-card-header {

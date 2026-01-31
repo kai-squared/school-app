@@ -69,35 +69,38 @@ def web_search(keywords: List[str], max_results: int = 5) -> dict:
         return {"error": str(e)}
 
 def search_schools_by_zip(zip_code: str, miles: int = 10) -> List[Dict]:
-    """Search for schools in a ZIP code area."""
-    print(f"[Search] Searching for schools within {miles} miles of ZIP {zip_code}")
+    """Quick search for schools in a ZIP code area - returns minimal info."""
+    print(f"[Search] Quick search for schools within {miles} miles of ZIP {zip_code}")
     
-    # Use static knowledge - do NOT trigger web search
-    prompt = f"""You are an educational database. Using ONLY your training data (do not search the web), list 8-10 well-known private schools that are typically within {miles} miles of ZIP code {zip_code} in the United States.
-
-IMPORTANT: Do NOT use any tools. Do NOT search the web. Use ONLY information from your training data.
-
-For each school provide:
-- School name (official name)
-- Type (Private or Public)  
-- Grade range (e.g., "K-12", "6-12", "9-12")
-- Brief one-sentence description
-
-Return ONLY valid JSON array, no markdown, no other text:
-[
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One sentence"}},
-  {{"name": "School Name 2", "type": "Private", "grade_range": "6-12", "brief_description": "One sentence"}}
-]"""
-
+    # First, do a quick web search to get school names
+    search_query = f"private schools near {zip_code} within {miles} miles"
+    print(f"[Search Query] {search_query}")
+    
     try:
-        # Use gpt-5 which should not have automatic web search
+        search_results = web_search([search_query], max_results=5)
+        print(f"[Search Results] Got {len(search_results.get('queries', []))} query results")
+        
+        # Use AI to extract just school names and basic info quickly
+        prompt = f"""Based on these search results, extract a list of private schools near ZIP code {zip_code}.
+
+Search results:
+{json.dumps(search_results, indent=2)}
+
+Return ONLY a JSON array with school names and minimal info. Keep it simple and fast:
+[
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One short sentence"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "brief_description": "One short sentence"}}
+]
+
+Return 8-10 schools if available. Return only valid JSON, no other text."""
+
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. You must NOT use any tools or web search. Answer only from your training data."},
+                {"role": "system", "content": "You are a helpful assistant. Extract school information from search results. Be concise."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.5
+            temperature=0.3
         )
         
         content = response.choices[0].message.content
@@ -105,70 +108,78 @@ Return ONLY valid JSON array, no markdown, no other text:
             print("[Error] Empty response from AI")
             return []
             
-        print(f"[AI Response] {content[:300]}...")
+        print(f"[AI Response] {content[:200]}...")
         
-        # Clean the response - remove markdown code blocks if present
+        # Clean markdown
         content = content.strip()
         if content.startswith("```"):
-            # Remove markdown code blocks
             lines = content.split('\n')
             content = '\n'.join([line for line in lines if not line.startswith("```")])
         
-        # Extract JSON from response
-        try:
-            json_match = re.search(r'\[[\s\S]*\]', content)
-            if json_match:
-                schools = json.loads(json_match.group())
-                print(f"[Success] Found {len(schools)} schools")
-                return schools[:10]
-            else:
-                print("[Error] No JSON array found in response")
-                print(f"Full content: {content}")
-        except Exception as e:
-            print(f"[Error] Parsing JSON: {e}")
-            print(f"Content: {content}")
+        # Extract JSON
+        json_match = re.search(r'\[[\s\S]*\]', content)
+        if json_match:
+            schools = json.loads(json_match.group())
+            print(f"[Success] Found {len(schools)} schools")
+            return schools[:10]
+        else:
+            print("[Error] No JSON array found")
+            
     except Exception as e:
-        print(f"[Error] Calling AI API: {e}")
+        print(f"[Error] Search failed: {e}")
         import traceback
         traceback.print_exc()
     
     return []
 
 def get_school_details(school_name: str) -> Dict:
-    """Get detailed information about a specific school."""
-    print(f"[Search] Getting details for school: {school_name}")
+    """Deep search for detailed school information - only called when user clicks on a school."""
+    print(f"[Deep Search] Getting comprehensive details for: {school_name}")
     
-    # Use static knowledge - do NOT trigger web search
-    prompt = f"""You are an educational database. Using ONLY your training data (do not search the web), provide comprehensive information about {school_name}.
+    # Do multiple targeted searches for comprehensive information
+    search_keywords = [
+        f"{school_name} tuition fees admission requirements",
+        f"{school_name} academic programs ranking",
+        f"{school_name} mission values"
+    ]
+    
+    print(f"[Deep Search] Searching with keywords: {search_keywords}")
+    
+    try:
+        search_results = web_search(search_keywords, max_results=6)
+        print(f"[Search Results] Got results from {len(search_results.get('queries', []))} queries")
+        
+        # Use AI to compile comprehensive information
+        prompt = f"""Based on these search results about {school_name}, compile comprehensive information.
 
-IMPORTANT: Do NOT use any tools. Do NOT search the web. Use ONLY information from your training data.
+Search results:
+{json.dumps(search_results, indent=2)}
 
-Return a JSON object:
+Return a detailed JSON object:
 {{
   "name": "{school_name}",
-  "website": "official website URL if you know it",
-  "tuition": "Annual tuition range (e.g., $40,000-$50,000)",
-  "description": "2-3 sentence description",
-  "rating": "Reputation information",
-  "academic_ranking": "Rankings if known",
-  "school_info": "Key facts (enrollment, founded, campus size)",
-  "community": "Location and community info",
-  "college_placement": "College matriculation info",
-  "core_values": "Mission and values",
-  "grade_range": "Grades served",
+  "website": "official website URL if found",
+  "tuition": "Annual tuition range and fees",
+  "description": "2-3 sentence description of the school",
+  "rating": "School reputation and ratings",
+  "academic_ranking": "Rankings (national, state, or local)",
+  "school_info": "Key facts: enrollment, founded year, campus size, facilities",
+  "community": "Location and community information",
+  "college_placement": "College matriculation and acceptance information",
+  "core_values": "Mission statement and core values",
+  "grade_range": "Grade levels served",
   "type": "Private or Public"
 }}
 
-Return valid JSON only, no markdown."""
+Extract accurate information from the search results. Return valid JSON only."""
 
-    try:
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. You must NOT use any tools or web search. Answer only from your training data."},
+                {"role": "system", "content": "You are a helpful assistant. Extract and compile school information from search results accurately."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.5
+            temperature=0.3
         )
         
         content = response.choices[0].message.content
@@ -176,28 +187,25 @@ Return valid JSON only, no markdown."""
             print("[Error] Empty response from AI")
             return {"name": school_name, "error": "Could not retrieve details"}
             
-        print(f"[AI Response] {content[:300]}...")
+        print(f"[AI Response] {content[:200]}...")
         
-        # Clean the response
+        # Clean markdown
         content = content.strip()
         if content.startswith("```"):
             lines = content.split('\n')
             content = '\n'.join([line for line in lines if not line.startswith("```")])
         
-        try:
-            json_match = re.search(r'\{[\s\S]*\}', content)
-            if json_match:
-                details = json.loads(json_match.group())
-                print(f"[Success] Retrieved details for {school_name}")
-                return details
-            else:
-                print("[Error] No JSON object found in response")
-                print(f"Full content: {content}")
-        except Exception as e:
-            print(f"[Error] Parsing JSON: {e}")
-            print(f"Content: {content}")
+        # Extract JSON
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            details = json.loads(json_match.group())
+            print(f"[Success] Retrieved detailed info for {school_name}")
+            return details
+        else:
+            print("[Error] No JSON found in response")
+            
     except Exception as e:
-        print(f"[Error] Calling AI API: {e}")
+        print(f"[Error] Deep search failed: {e}")
         import traceback
         traceback.print_exc()
     

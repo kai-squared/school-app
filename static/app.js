@@ -331,11 +331,11 @@ function createSchoolCard(school, expanded = false) {
     const isInWatchlist = state.watchlist.some(s => s.name === school.name);
     
     return `
-        <div class="school-card">
+        <div class="school-card" data-school-name="${school.name}">
             <div class="school-card-header">
                 <div>
                     <div class="school-card-title">${school.name}</div>
-                    <div class="school-card-type">${school.type || 'School'} ${school.grade_range ? '• ' + school.grade_range : ''}</div>
+                    <div class="school-card-type">${school.type || 'Private'} ${school.grade_range ? '• ' + school.grade_range : ''}</div>
                 </div>
                 <div class="school-card-actions">
                     <button class="icon-btn ${isInWatchlist ? 'added' : ''}" onclick="toggleWatchlist('${school.name.replace(/'/g, "\\'")}', ${JSON.stringify(school).replace(/"/g, '&quot;')})" title="Add to watchlist">
@@ -345,7 +345,7 @@ function createSchoolCard(school, expanded = false) {
                 </div>
             </div>
             <div class="school-card-description">${school.brief_description || school.description || ''}</div>
-            ${expanded && school.website ? `<div class="detail-item"><div class="detail-label">Website</div><div class="detail-value"><a href="${school.website}" target="_blank">${school.website}</a></div></div>` : ''}
+            ${expanded && school.website ? `<div class="detail-item"><div class="detail-label">🌐 Website</div><div class="detail-value"><a href="${school.website}" target="_blank">${school.website}</a></div></div>` : ''}
             ${expanded ? `
                 <div class="school-card-details expanded">
                     ${school.tuition ? `<div class="detail-item"><div class="detail-label">💰 Tuition</div><div class="detail-value">${school.tuition}</div></div>` : ''}
@@ -362,8 +362,13 @@ function createSchoolCard(school, expanded = false) {
 }
 
 async function loadSchoolDetails(schoolName) {
-    const resultsContainer = document.getElementById('searchResults');
-    resultsContainer.innerHTML = '<div class="loading">📚 Loading school details...</div>';
+    // Find the school card
+    const schoolCard = document.querySelector(`[data-school-name="${schoolName}"]`);
+    if (!schoolCard) return;
+    
+    // Show loading state
+    const originalHTML = schoolCard.innerHTML;
+    schoolCard.innerHTML = '<div class="loading" style="padding: 40px; text-align: center;">📚 Loading detailed information...</div>';
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/schools/details`, {
@@ -378,11 +383,15 @@ async function loadSchoolDetails(schoolName) {
             throw new Error(data.error || 'Failed to load details');
         }
         
-        displaySchoolDetails(data.school);
+        // Replace the entire card with detailed version
+        const detailedCard = createSchoolCard(data.school, true);
+        schoolCard.outerHTML = detailedCard;
+        
+        // Update search context
         state.searchContext = JSON.stringify(data.school);
         
     } catch (error) {
-        resultsContainer.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+        schoolCard.innerHTML = originalHTML + `<div class="error" style="margin-top: 12px;">Error loading details: ${error.message}</div>`;
     }
 }
 
