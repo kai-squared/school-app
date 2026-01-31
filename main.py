@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +9,8 @@ import os
 import requests
 import json
 from bs4 import BeautifulSoup
+from typing import Optional, List, Dict, Any
+import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,34 +38,26 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # Use AI_BUILDER_TOKEN in deployment, SUPER_MIND_API_KEY for local development
 API_KEY = os.getenv("AI_BUILDER_TOKEN") or os.getenv("SUPER_MIND_API_KEY")
 SEARCH_API_URL = "https://space.ai-builders.com/backend/v1/search/"
+TRANSCRIPTION_API_URL = "https://space.ai-builders.com/backend/v1/audio/transcriptions"
 
 # Initialize OpenAI client with custom base URL
-# Using the AI Builders Space backend which supports multiple models
 client = OpenAI(
     api_key=API_KEY,
     base_url="https://space.ai-builders.com/backend"
 )
 
+# ===== HELPER FUNCTIONS =====
 
-# Web search function
-def web_search(query: str) -> dict:
-    """
-    Performs a web search using the internal search API.
-    
-    Args:
-        query: The search query string
-        
-    Returns:
-        dict: Search results from the API
-    """
+def web_search(keywords: List[str], max_results: int = 5) -> dict:
+    """Performs a web search using the internal search API."""
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
     
     payload = {
-        "keywords": [query],
-        "max_results": 3
+        "keywords": keywords,
+        "max_results": max_results
     }
     
     try:
@@ -73,290 +67,463 @@ def web_search(query: str) -> dict:
     except requests.exceptions.RequestException as e:
         return {"error": str(e)}
 
-
-# Read page function
-def read_page(url: str) -> dict:
-    """
-    Fetches a web page and extracts the main text content.
+def search_schools_by_zip(zip_code: str) -> List[Dict]:
+    """Search for top 10 schools in a ZIP code area."""
+    print(f"[Search] Searching for top 10 schools in ZIP {zip_code}")
     
-    Args:
-        url: The URL of the page to read
-        
-    Returns:
-        dict: Extracted text content from the page
-    """
-    try:
-        # Fetch the page
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-        }
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        # Parse HTML
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # Remove script and style elements
-        for script in soup(["script", "style", "nav", "footer", "header", "aside"]):
-            script.decompose()
-        
-        # Get text
-        text = soup.get_text()
-        
-        # Clean up text - remove extra whitespace
-        lines = (line.strip() for line in text.splitlines())
-        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        text = ' '.join(chunk for chunk in chunks if chunk)
-        
-        # Limit text length to avoid token limits (first 5000 characters)
-        if len(text) > 5000:
-            text = text[:5000] + "... (content truncated)"
-        
-        return {
-            "url": url,
-            "content": text,
-            "length": len(text)
-        }
-    except requests.exceptions.RequestException as e:
-        return {"error": str(e), "url": url}
+    # Search for schools in this ZIP code
+    search_results = web_search([f"top rated schools in {zip_code} area", f"best private schools {zip_code}"], max_results=8)
+    
+    # Use AI to extract school names and basic info
+    prompt = f"""Based on the following search results, extract the top 10 schools (if available) in ZIP code {zip_code}.
+    
+Search results:
+{json.dumps(search_results, indent=2)}
 
-
-# Define the tool schema for the LLM
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "web_search",
-            "description": "Searches the web for current information about a topic. Use this when you need up-to-date information or facts that you don't know.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query to look up on the web"
-                    }
-                },
-                "required": ["query"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "read_page",
-            "description": "Fetches and reads the content of a specific web page. Use this when you need to read detailed information from a known URL.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "The full URL of the web page to read"
-                    }
-                },
-                "required": ["url"]
-            }
-        }
-    }
+Return a JSON array of schools with this format:
+[
+  {{
+    "name": "School Name",
+    "type": "Private/Public",
+    "grade_range": "K-12",
+    "brief_description": "One sentence description"
+  }}
 ]
 
+Only return valid JSON array, no additional text."""
 
-class ChatRequest(BaseModel):
-    user_message: str
+    response = client.chat.completions.create(
+        model="supermind-agent-v1",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3
+    )
+    
+    content = response.choices[0].message.content
+    
+    # Extract JSON from response
+    try:
+        # Try to find JSON array in the response
+        json_match = re.search(r'\[[\s\S]*\]', content)
+        if json_match:
+            schools = json.loads(json_match.group())
+            return schools[:10]  # Return top 10
+    except:
+        pass
+    
+    return []
 
+def get_school_details(school_name: str) -> Dict:
+    """Get detailed information about a specific school."""
+    print(f"[Search] Getting details for school: {school_name}")
+    
+    # Search for comprehensive school information
+    search_keywords = [
+        f"{school_name} tuition fees admission",
+        f"{school_name} ranking academic programs",
+        f"{school_name} core values mission",
+        f"{school_name} official website information"
+    ]
+    
+    search_results = web_search(search_keywords, max_results=8)
+    
+    # Use AI to compile detailed information
+    prompt = f"""Based on the following search results about {school_name}, compile comprehensive information.
 
-class ChatResponse(BaseModel):
-    content: str
-    tool_calls: list = None  # Optional field to show tool calls
+Search results:
+{json.dumps(search_results, indent=2)}
 
+Return a JSON object with this structure:
+{{
+  "name": "{school_name}",
+  "website": "official website URL",
+  "tuition": "费用信息 (annual costs)",
+  "description": "学校介绍 (2-3 sentences)",
+  "official_data": "官方数据 (enrollment, founded year, etc)",
+  "rating": "学校评价 (overall rating and reviews)",
+  "academic_ranking": "学术排名 (national/state rankings)",
+  "school_info": "私校信息 (private school specific info)",
+  "community": "社区信息 (community and location)",
+  "college_placement": "升学情况 (college matriculation)",
+  "core_values": "核心价值观 (mission and values)",
+  "grade_range": "年级范围",
+  "type": "Public/Private"
+}}
 
-class HelloRequest(BaseModel):
-    input: str
+Return valid JSON only."""
 
+    response = client.chat.completions.create(
+        model="supermind-agent-v1",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3
+    )
+    
+    content = response.choices[0].message.content
+    
+    try:
+        # Extract JSON from response
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            details = json.loads(json_match.group())
+            return details
+    except Exception as e:
+        print(f"Error parsing school details: {e}")
+    
+    return {"name": school_name, "error": "Could not retrieve details"}
+
+# ===== REQUEST/RESPONSE MODELS =====
+
+class SchoolSearchRequest(BaseModel):
+    query: str
+    search_type: str  # "zip" or "name"
+
+class SchoolDetailsRequest(BaseModel):
+    school_name: str
+
+class ChatWithSchoolsRequest(BaseModel):
+    message: str
+    context: Optional[str] = None
+
+class ApplicationQuestionRequest(BaseModel):
+    school_name: str
+    school_context: str
+    question: str
+    student_profile: Dict[str, Any]
+
+class InterviewQuestionsRequest(BaseModel):
+    school_name: str
+    school_context: str
+    student_profile: Dict[str, Any]
+
+class TranscriptionRequest(BaseModel):
+    question: str
+    school_context: str
+    student_profile: Dict[str, Any]
+    transcription: str
+
+# ===== ROUTES =====
 
 @app.get("/")
 async def root():
-    """
-    Serve the main chat application.
-    """
+    """Serve the main application."""
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
+@app.post("/api/schools/search")
+async def search_schools(request: SchoolSearchRequest):
+    """Search for schools by ZIP code or name."""
+    try:
+        if request.search_type == "zip":
+            schools = search_schools_by_zip(request.query)
+            return {
+                "success": True,
+                "search_type": "zip",
+                "query": request.query,
+                "schools": schools
+            }
+        else:  # search by name
+            details = get_school_details(request.query)
+            return {
+                "success": True,
+                "search_type": "name",
+                "query": request.query,
+                "school": details
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
-@app.post("/hello")
-async def hello(request: HelloRequest):
-    """
-    Simple endpoint that returns a greeting message with the provided input.
-    """
-    return {"message": f"Hello, World {request.input}"}
+@app.post("/api/schools/details")
+async def get_details(request: SchoolDetailsRequest):
+    """Get detailed information about a specific school."""
+    try:
+        details = get_school_details(request.school_name)
+        return {
+            "success": True,
+            "school": details
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
+@app.post("/api/schools/chat")
+async def chat_about_schools(request: ChatWithSchoolsRequest):
+    """Chat with AI about schools."""
+    try:
+        # Build context-aware prompt
+        system_prompt = """You are a helpful assistant for school research. 
+Answer questions about schools, admissions, rankings, and education.
+Be informative and helpful for parents researching schools."""
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    """
-    Chat endpoint with full agentic loop.
-    The LLM can call tools, receive results, and provide a final answer.
-    Maximum of 3 turns to prevent infinite loops.
-    """
-    max_turns = 3
-    
-    # Initialize conversation with user message
-    messages = [
-        {"role": "user", "content": request.user_message}
-    ]
-    
-    print(f"\n{'='*80}")
-    print(f"[User] {request.user_message}")
-    print(f"{'='*80}\n")
-    
-    # Agentic loop
-    for turn in range(max_turns):
-        print(f"[Turn {turn + 1}/{max_turns}]")
+        messages = [
+            {"role": "system", "content": system_prompt}
+        ]
         
-        # Make API call with current conversation history
-        # Using supermind-agent-v1 which has built-in web search capabilities
-        completion = client.chat.completions.create(
+        if request.context:
+            messages.append({"role": "system", "content": f"Context: {request.context}"})
+        
+        messages.append({"role": "user", "content": request.message})
+        
+        response = client.chat.completions.create(
             model="supermind-agent-v1",
             messages=messages,
-            tools=tools,
-            tool_choice="auto"
+            temperature=0.7
         )
         
-        response_message = completion.choices[0].message
+        return {
+            "success": True,
+            "response": response.choices[0].message.content
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/api/application/analyze")
+async def analyze_application_question(request: ApplicationQuestionRequest):
+    """Analyze and answer an application question."""
+    try:
+        prompt = f"""You are an expert college admissions consultant helping a student write their school application.
+
+School: {request.school_name}
+School Context: {request.school_context}
+
+Student Profile:
+{json.dumps(request.student_profile, indent=2)}
+
+Application Question:
+{request.question}
+
+Please provide:
+1. Analysis of what the question is asking for
+2. Key points to address based on the school's values and the student's profile
+3. A well-written response (300-500 words) that:
+   - Highlights relevant experiences and qualities from the student's profile
+   - Aligns with the school's core values and mission
+   - Shows genuine interest and fit
+   - Is authentic and personal
+   - Demonstrates thoughtfulness and maturity
+
+Format your response as JSON:
+{{
+  "analysis": "What the question is really asking",
+  "key_points": ["point 1", "point 2", "point 3"],
+  "suggested_response": "The full essay response here",
+  "tips": ["tip 1", "tip 2"]
+}}"""
+
+        response = client.chat.completions.create(
+            model="supermind-agent-v1",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
         
-        # Add assistant's response to conversation history
-        messages.append({
-            "role": "assistant",
-            "content": response_message.content,
-            "tool_calls": [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {
-                        "name": tc.function.name,
-                        "arguments": tc.function.arguments
-                    }
+        content = response.choices[0].message.content
+        
+        # Try to parse JSON
+        try:
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                result = json.loads(json_match.group())
+                return {
+                    "success": True,
+                    "analysis": result
                 }
-                for tc in (response_message.tool_calls or [])
-            ] if response_message.tool_calls else None
-        })
+        except:
+            pass
         
-        # Check if the model wants to call tools
-        if response_message.tool_calls:
-            print(f"[Agent] Decided to call {len(response_message.tool_calls)} tool(s):")
+        # If JSON parsing fails, return as plain text
+        return {
+            "success": True,
+            "analysis": {
+                "suggested_response": content
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/api/interview/generate")
+async def generate_interview_questions(request: InterviewQuestionsRequest):
+    """Generate sample interview questions for a school."""
+    try:
+        prompt = f"""Generate 8 realistic interview questions that {request.school_name} might ask during a student interview.
+
+School Context: {request.school_context}
+
+Student Profile:
+{json.dumps(request.student_profile, indent=2)}
+
+Consider the school's values, the student's background, and typical private school interview questions.
+Include a mix of:
+- Questions about academic interests
+- Questions about personal qualities and character
+- Questions about why they're interested in this school
+- Questions about extracurricular activities
+- Questions about challenges and growth
+
+Return as JSON array:
+[
+  {{"question": "Question 1", "category": "Academic"}},
+  {{"question": "Question 2", "category": "Personal"}},
+  ...
+]"""
+
+        response = client.chat.completions.create(
+            model="supermind-agent-v1",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.8
+        )
+        
+        content = response.choices[0].message.content
+        
+        try:
+            json_match = re.search(r'\[[\s\S]*\]', content)
+            if json_match:
+                questions = json.loads(json_match.group())
+                return {
+                    "success": True,
+                    "questions": questions
+                }
+        except:
+            pass
+        
+        return {
+            "success": False,
+            "error": "Could not generate questions"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/api/interview/transcribe")
+async def transcribe_audio(audio_file: UploadFile = File(...)):
+    """Transcribe audio file."""
+    try:
+        # Save uploaded file temporarily
+        temp_path = f"/tmp/{audio_file.filename}"
+        with open(temp_path, "wb") as f:
+            content = await audio_file.read()
+            f.write(content)
+        
+        # Call transcription API
+        headers = {
+            "Authorization": f"Bearer {API_KEY}"
+        }
+        
+        with open(temp_path, "rb") as audio:
+            files = {"audio_file": audio}
+            data = {"model": "whisper-1"}
             
-            # Execute each tool call
-            for tool_call in response_message.tool_calls:
-                function_name = tool_call.function.name
-                function_args = json.loads(tool_call.function.arguments)
-                
-                print(f"  → Tool: '{function_name}'")
-                print(f"  → Arguments: {function_args}")
-                
-                # Execute the tool
-                if function_name == "web_search":
-                    query = function_args.get("query", "")
-                    print(f"  → Executing search for: '{query}'")
-                    
-                    # Call the web_search function
-                    tool_result = web_search(query)
-                    
-                    print(f"  → [System] Tool Output: {json.dumps(tool_result, indent=2)[:200]}...")
-                    
-                    # Add tool result to conversation
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": json.dumps(tool_result)
-                    })
-                    
-                elif function_name == "read_page":
-                    url = function_args.get("url", "")
-                    print(f"  → Reading page: '{url}'")
-                    
-                    # Call the read_page function
-                    tool_result = read_page(url)
-                    
-                    if "error" in tool_result:
-                        print(f"  → [System] Error reading page: {tool_result['error']}")
-                    else:
-                        print(f"  → [System] Successfully read {tool_result.get('length', 0)} characters")
-                        print(f"  → [System] Content preview: {tool_result.get('content', '')[:150]}...")
-                    
-                    # Add tool result to conversation
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": json.dumps(tool_result)
-                    })
-                    
-                else:
-                    # Unknown tool
-                    print(f"  → [System] Error: Unknown tool '{function_name}'")
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": json.dumps({"error": f"Unknown tool: {function_name}"})
-                    })
-            
-            print()  # Empty line for readability
-            
-            # Continue the loop to get the LLM's response with tool results
-            continue
-        else:
-            # No more tool calls - we have a final answer
-            final_answer = response_message.content or ""
-            print(f"[Agent] Final Answer: {final_answer}\n")
-            
-            # Print the complete message history
-            print(f"{'='*80}")
-            print("[MESSAGE HISTORY - Complete Conversation]")
-            print(f"{'='*80}\n")
-            
-            for idx, msg in enumerate(messages):
-                role = msg.get("role", "unknown")
-                print(f"--- Message {idx + 1}: {role.upper()} ---")
-                
-                if role == "user":
-                    print(f"Content: {msg.get('content', '')}\n")
-                
-                elif role == "assistant":
-                    content = msg.get("content")
-                    tool_calls = msg.get("tool_calls")
-                    
-                    if content:
-                        print(f"Content: {content}")
-                    
-                    if tool_calls:
-                        print(f"Tool Calls ({len(tool_calls)} total):")
-                        for tc in tool_calls:
-                            func_name = tc.get("function", {}).get("name", "unknown")
-                            func_args = tc.get("function", {}).get("arguments", "")
-                            print(f"  • {func_name}({func_args})")
-                    print()
-                
-                elif role == "tool":
-                    tool_call_id = msg.get("tool_call_id", "unknown")
-                    content = msg.get("content", "")
-                    
-                    # Try to parse and pretty-print JSON content
-                    try:
-                        parsed = json.loads(content)
-                        content_preview = json.dumps(parsed, indent=2)[:500]
-                        if len(json.dumps(parsed)) > 500:
-                            content_preview += "\n... (truncated)"
-                    except:
-                        content_preview = content[:500]
-                        if len(content) > 500:
-                            content_preview += "... (truncated)"
-                    
-                    print(f"Tool Call ID: {tool_call_id}")
-                    print(f"Result:\n{content_preview}\n")
-            
-            print(f"{'='*80}\n")
-            
-            return ChatResponse(content=final_answer)
-    
-    # If we've exhausted max_turns, return the last message
-    print(f"[System] Max turns ({max_turns}) reached. Returning last response.\n")
-    print(f"{'='*80}\n")
-    
-    return ChatResponse(content=messages[-1].get("content", "I apologize, but I couldn't complete your request within the allowed iterations."))
+            response = requests.post(
+                TRANSCRIPTION_API_URL,
+                headers=headers,
+                files=files,
+                data=data
+            )
+            response.raise_for_status()
+            result = response.json()
+        
+        # Clean up temp file
+        os.remove(temp_path)
+        
+        return {
+            "success": True,
+            "transcription": result.get("text", "")
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/api/interview/feedback")
+async def get_interview_feedback(request: TranscriptionRequest):
+    """Get AI feedback on interview response."""
+    try:
+        prompt = f"""You are an expert interview coach evaluating a student's interview response.
+
+Question: {request.question}
+
+School Context: {request.school_context}
+
+Student Profile:
+{json.dumps(request.student_profile, indent=2)}
+
+Student's Response (transcribed):
+{request.transcription}
+
+Provide detailed feedback on:
+1. Grammar and clarity
+2. Relevance to the question
+3. Alignment with school values
+4. Strengths of the response
+5. Areas for improvement
+6. Specific suggestions
+
+Format as JSON:
+{{
+  "overall_score": "8/10",
+  "grammar": {{
+    "score": "9/10",
+    "feedback": "Grammar feedback here"
+  }},
+  "relevance": {{
+    "score": "7/10",
+    "feedback": "Relevance feedback here"
+  }},
+  "alignment": {{
+    "score": "8/10",
+    "feedback": "School alignment feedback here"
+  }},
+  "strengths": ["strength 1", "strength 2"],
+  "improvements": ["improvement 1", "improvement 2"],
+  "suggestions": ["specific suggestion 1", "specific suggestion 2"]
+}}"""
+
+        response = client.chat.completions.create(
+            model="supermind-agent-v1",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5
+        )
+        
+        content = response.choices[0].message.content
+        
+        try:
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                feedback = json.loads(json_match.group())
+                return {
+                    "success": True,
+                    "feedback": feedback
+                }
+        except:
+            pass
+        
+        return {
+            "success": True,
+            "feedback": {
+                "overall_score": "N/A",
+                "suggestions": [content]
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

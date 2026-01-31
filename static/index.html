@@ -29,15 +29,136 @@
                 </button>
             </nav>
             
+            <div class="watchlist-section">
+                <h4>📌 My School Watchlist</h4>
+                <div id="watchlistContainer" class="watchlist-container">
+                    <p class="empty-watchlist">No schools added yet</p>
+                </div>
+            </div>
+            
             <div class="sidebar-footer">
-                <div class="student-profile-summary" id="profileSummary">
-                    <h4>Student Profile</h4>
-                    <p class="no-profile">No profile set</p>
+                <div class="profile-status" id="profileStatus">
+                    <button id="manageProfileBtn" class="profile-btn">
+                        <span>👤</span>
+                        <span id="profileBtnText">Create Profile</span>
+                    </button>
                 </div>
             </div>
         </div>
         
         <div class="main-content">
+            <!-- Profile Questionnaire Modal -->
+            <div id="profileModal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>📝 Student Profile Questionnaire</h2>
+                        <button class="close-modal" onclick="closeProfileModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="profileForm">
+                            <div class="form-section">
+                                <h3>基本信息 (Basic Information)</h3>
+                                <div class="form-group">
+                                    <label>Student's Name *</label>
+                                    <input type="text" name="studentName" required>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Current Grade *</label>
+                                        <select name="currentGrade" required>
+                                            <option value="">Select...</option>
+                                            <option value="K">Kindergarten</option>
+                                            <option value="1">Grade 1</option>
+                                            <option value="2">Grade 2</option>
+                                            <option value="3">Grade 3</option>
+                                            <option value="4">Grade 4</option>
+                                            <option value="5">Grade 5</option>
+                                            <option value="6">Grade 6</option>
+                                            <option value="7">Grade 7</option>
+                                            <option value="8">Grade 8</option>
+                                            <option value="9">Grade 9</option>
+                                            <option value="10">Grade 10</option>
+                                            <option value="11">Grade 11</option>
+                                            <option value="12">Grade 12</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Target Grade Level</label>
+                                        <input type="text" name="targetGrade" placeholder="e.g., 9th grade">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3>学术兴趣 (Academic Interests)</h3>
+                                <div class="form-group">
+                                    <label>Favorite Subjects</label>
+                                    <input type="text" name="favoriteSubjects" placeholder="e.g., Math, Science, English">
+                                    <small>What subjects does your child enjoy most?</small>
+                                </div>
+                                <div class="form-group">
+                                    <label>Academic Strengths</label>
+                                    <textarea name="academicStrengths" rows="3" placeholder="Describe your child's academic strengths, special talents, or areas where they excel..."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Areas for Growth</label>
+                                    <textarea name="areasForGrowth" rows="2" placeholder="Any subjects or skills your child is working to improve..."></textarea>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3>课外活动 (Extracurricular Activities)</h3>
+                                <div class="form-group">
+                                    <label>Activities & Hobbies</label>
+                                    <textarea name="activities" rows="3" placeholder="Sports, music, arts, clubs, volunteer work, etc. What does your child do outside of school?"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Leadership Experience</label>
+                                    <textarea name="leadership" rows="2" placeholder="Any leadership roles, team captain positions, or group projects led..."></textarea>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3>个性特点 (Personal Characteristics)</h3>
+                                <div class="form-group">
+                                    <label>Personality Traits</label>
+                                    <textarea name="personality" rows="2" placeholder="How would you describe your child's personality? (e.g., curious, creative, determined, compassionate)"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Special Achievements or Awards</label>
+                                    <textarea name="achievements" rows="2" placeholder="Any special accomplishments, awards, competitions, or recognitions..."></textarea>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3>教育目标 (Educational Goals)</h3>
+                                <div class="form-group">
+                                    <label>Why Private School?</label>
+                                    <textarea name="whyPrivateSchool" rows="3" placeholder="What are you hoping to find in a private school education for your child?"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Long-term Goals</label>
+                                    <textarea name="longTermGoals" rows="2" placeholder="What are your child's future aspirations or goals?"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3>其他信息 (Additional Information)</h3>
+                                <div class="form-group">
+                                    <label>Unique Qualities or Experiences</label>
+                                    <textarea name="uniqueQualities" rows="3" placeholder="Anything else that makes your child special or unique? Any important experiences that have shaped who they are?"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="modal-actions">
+                                <button type="button" class="secondary-btn" onclick="closeProfileModal()">Cancel</button>
+                                <button type="submit" class="primary-btn">Save Profile</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             <!-- Search Section -->
             <section id="searchSection" class="content-section active">
                 <div class="section-header">
@@ -47,12 +168,7 @@
                 
                 <div class="search-container">
                     <div class="search-input-group">
-                        <input 
-                            type="text" 
-                            id="schoolSearchInput" 
-                            placeholder="Enter ZIP code (e.g., 94103) or school name..."
-                            class="search-input"
-                        />
+                        <input type="text" id="schoolSearchInput" placeholder="Enter ZIP code (e.g., 94103) or school name..." class="search-input"/>
                         <button id="searchBtn" class="primary-btn">Search Schools</button>
                     </div>
                     
@@ -62,7 +178,7 @@
                             <h3>Find Your Perfect School</h3>
                             <p>Search by ZIP code to find schools in your area, or enter a specific school name</p>
                             <div class="example-searches">
-                                <button class="example-chip">94103</button>
+                                <button class="example-chip">10024</button>
                                 <button class="example-chip">Phillips Academy Andover</button>
                                 <button class="example-chip">Harvard-Westlake School</button>
                             </div>
@@ -70,14 +186,10 @@
                     </div>
                     
                     <div id="schoolChat" class="school-chat hidden">
-                        <h3>Chat about Schools</h3>
+                        <h3>💬 Ask Questions About Schools</h3>
                         <div id="chatMessages" class="chat-messages"></div>
                         <div class="chat-input-container">
-                            <textarea 
-                                id="chatInput" 
-                                placeholder="Ask about schools, rankings, programs..." 
-                                rows="2"
-                            ></textarea>
+                            <textarea id="chatInput" placeholder="Ask about schools, rankings, programs..." rows="2"></textarea>
                             <button id="chatSendBtn" class="send-btn">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                                     <path d="M22 2L11 13" stroke="currentColor" stroke-width="2"/>
@@ -97,43 +209,33 @@
                 </div>
                 
                 <div class="application-container">
-                    <div class="profile-setup">
-                        <h3>Student Profile</h3>
-                        <textarea 
-                            id="studentProfile" 
-                            placeholder="Tell us about yourself: interests, achievements, goals, extracurriculars..."
-                            rows="6"
-                            class="profile-textarea"
-                        ></textarea>
-                        <button id="saveProfileBtn" class="primary-btn">Save Profile</button>
+                    <div class="school-selector-box">
+                        <h3>Select School from Watchlist</h3>
+                        <select id="appSchoolSelect" class="school-select">
+                            <option value="">Select a school...</option>
+                        </select>
                     </div>
-                    
+
                     <div class="application-workspace">
                         <h3>Application Question</h3>
-                        <textarea 
-                            id="applicationQuestion" 
-                            placeholder="Paste the application question here..."
-                            rows="4"
-                            class="question-textarea"
-                        ></textarea>
+                        <textarea id="applicationQuestion" placeholder="Paste the application question here..." rows="4" class="question-textarea"></textarea>
                         
-                        <div class="school-context">
-                            <h4>Selected School</h4>
-                            <div id="selectedSchool" class="school-context-box">
-                                <p class="no-selection">No school selected. Search for a school first.</p>
-                            </div>
-                        </div>
-                        
-                        <button id="generateResponseBtn" class="primary-btn" disabled>
-                            Generate Response
-                        </button>
+                        <button id="analyzeQuestionBtn" class="primary-btn" disabled>Analyze & Generate Response</button>
                         
                         <div id="applicationResponse" class="response-area hidden">
-                            <h3>AI-Generated Response</h3>
-                            <div id="generatedText" class="generated-text"></div>
+                            <div class="analysis-section">
+                                <h4>📊 Question Analysis</h4>
+                                <div id="analysisContent" class="analysis-content"></div>
+                            </div>
+                            
+                            <div class="response-section">
+                                <h4>✍️ Suggested Response</h4>
+                                <div id="generatedResponse" class="generated-text" contenteditable="true"></div>
+                            </div>
+                            
                             <div class="response-actions">
-                                <button class="secondary-btn">Refine</button>
-                                <button class="secondary-btn">Copy</button>
+                                <button class="secondary-btn" onclick="regenerateResponse()">🔄 Regenerate</button>
+                                <button class="secondary-btn" onclick="copyResponse()">📋 Copy</button>
                             </div>
                         </div>
                     </div>
@@ -148,17 +250,12 @@
                 </div>
                 
                 <div class="interview-container">
-                    <div class="interview-setup">
-                        <div class="setup-item">
-                            <h4>Selected School</h4>
-                            <div id="interviewSchool" class="school-selector">
-                                <p class="no-selection">No school selected</p>
-                            </div>
-                        </div>
-                        
-                        <button id="generateQuestionsBtn" class="primary-btn" disabled>
-                            Generate Interview Questions
-                        </button>
+                    <div class="school-selector-box">
+                        <h3>Select School from Watchlist</h3>
+                        <select id="interviewSchoolSelect" class="school-select">
+                            <option value="">Select a school...</option>
+                        </select>
+                        <button id="generateQuestionsBtn" class="primary-btn" disabled>Generate Interview Questions</button>
                     </div>
                     
                     <div id="interviewQuestions" class="questions-container hidden">
@@ -182,15 +279,15 @@
                         </div>
                         
                         <div id="transcriptionArea" class="transcription-area hidden">
-                            <h4>Your Response (Transcribed)</h4>
+                            <h4>📝 Your Response (Transcribed)</h4>
                             <div id="transcriptionText" class="transcription-text"></div>
                             
                             <div id="feedback" class="feedback-container">
-                                <h4>AI Feedback</h4>
+                                <h4>🎯 AI Feedback</h4>
                                 <div id="feedbackContent" class="feedback-content"></div>
                             </div>
                             
-                            <button class="secondary-btn" id="nextQuestionBtn">Next Question</button>
+                            <button class="secondary-btn" id="nextQuestionBtn">Next Question →</button>
                         </div>
                     </div>
                 </div>

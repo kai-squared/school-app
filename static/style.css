@@ -97,6 +97,116 @@ body {
     border-top: 2px solid rgba(102, 126, 234, 0.15);
 }
 
+.watchlist-section {
+    margin-top: 24px;
+    margin-bottom: 16px;
+}
+
+.watchlist-section h4 {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.watchlist-container {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.empty-watchlist {
+    font-size: 13px;
+    color: #999;
+    font-style: italic;
+    padding: 12px;
+    text-align: center;
+}
+
+.watchlist-item {
+    padding: 10px 12px;
+    background: rgba(102, 126, 234, 0.08);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.watchlist-item:hover {
+    background: rgba(102, 126, 234, 0.15);
+    transform: translateX(2px);
+}
+
+.watchlist-item.selected {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.watchlist-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.watchlist-item-type {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.remove-watchlist {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.3);
+    border: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.watchlist-item:hover .remove-watchlist {
+    opacity: 1;
+}
+
+.profile-status {
+    margin-top: 16px;
+}
+
+.profile-btn {
+    width: 100%;
+    padding: 12px;
+    background: rgba(102, 126, 234, 0.1);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #667eea;
+}
+
+.profile-btn:hover {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: #667eea;
+}
+
+.profile-btn.has-profile {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+    border-color: #667eea;
+}
+
 .student-profile-summary h4 {
     font-size: 14px;
     color: #333;
@@ -642,4 +752,365 @@ body {
         flex-direction: row;
         overflow-x: auto;
     }
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: white;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 85vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    padding: 24px 32px;
+    border-bottom: 2px solid rgba(102, 126, 234, 0.15);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    font-size: 24px;
+    color: #333;
+    margin: 0;
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    font-size: 32px;
+    color: #999;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.close-modal:hover {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+}
+
+.modal-body {
+    padding: 32px;
+    overflow-y: auto;
+}
+
+.form-section {
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+}
+
+.form-section h3 {
+    font-size: 18px;
+    color: #667eea;
+    margin-bottom: 16px;
+    font-weight: 600;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid rgba(102, 126, 234, 0.2);
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.form-group small {
+    display: block;
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 2px solid rgba(102, 126, 234, 0.1);
+}
+
+/* School Cards */
+.school-card {
+    background: rgba(102, 126, 234, 0.05);
+    border: 2px solid rgba(102, 126, 234, 0.15);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    transition: all 0.2s;
+}
+
+.school-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.school-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.school-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.school-card-type {
+    font-size: 13px;
+    color: #667eea;
+    font-weight: 600;
+}
+
+.school-card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.icon-btn {
+    background: rgba(102, 126, 234, 0.1);
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all 0.2s;
+}
+
+.icon-btn:hover {
+    background: rgba(102, 126, 234, 0.2);
+    transform: scale(1.1);
+}
+
+.icon-btn.added {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.school-card-description {
+    font-size: 14px;
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+
+.school-card-details {
+    display: none;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 2px solid rgba(102, 126, 234, 0.15);
+}
+
+.school-card-details.expanded {
+    display: block;
+}
+
+.detail-item {
+    margin-bottom: 12px;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: #667eea;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.detail-value {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.6;
+}
+
+.expand-btn {
+    background: none;
+    border: none;
+    color: #667eea;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 8px 0;
+    transition: color 0.2s;
+}
+
+.expand-btn:hover {
+    color: #764ba2;
+}
+
+.school-selector-box {
+    padding: 24px;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 16px;
+    margin-bottom: 24px;
+}
+
+.school-selector-box h3 {
+    font-size: 18px;
+    color: #333;
+    margin-bottom: 12px;
+}
+
+.school-select {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid rgba(102, 126, 234, 0.2);
+    border-radius: 12px;
+    font-size: 15px;
+    font-family: inherit;
+    background: white;
+    cursor: pointer;
+    margin-bottom: 16px;
+}
+
+.school-select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.analysis-section {
+    margin-bottom: 24px;
+    padding: 20px;
+    background: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid #ffc107;
+    border-radius: 12px;
+}
+
+.analysis-section h4 {
+    font-size: 16px;
+    color: #f57c00;
+    margin-bottom: 12px;
+}
+
+.analysis-content {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.8;
+}
+
+.response-section {
+    margin-bottom: 24px;
+}
+
+.response-section h4 {
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 12px;
+}
+
+.chat-message {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    max-width: 85%;
+}
+
+.chat-message.user {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    margin-left: auto;
+}
+
+.chat-message.assistant {
+    background: rgba(102, 126, 234, 0.1);
+    color: #333;
+}
+
+.chat-message strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+.chat-message p {
+    margin: 0;
+    line-height: 1.6;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #667eea;
+    font-size: 16px;
+}
+
+.error {
+    text-align: center;
+    padding: 40px;
+    color: #f44336;
+    font-size: 14px;
 }
