@@ -73,14 +73,12 @@ def search_schools_by_zip(zip_code: str) -> List[Dict]:
     print(f"[Search] Searching for schools near ZIP {zip_code}")
     
     # Use direct chat without tools to avoid search rate limits
-    prompt = f"""You are a helpful assistant that knows about private schools in the United States.
-
-List 8-10 well-known private schools within 10 miles of ZIP code {zip_code}.
+    prompt = f"""Based on your knowledge, list 8-10 well-known private schools within 10 miles of ZIP code {zip_code} in the United States.
 
 For each school, provide:
 - School name (official name)
-- Type (Private/Public)
-- Grade range (e.g., "K-12", "6-12")
+- Type (Private or Public)
+- Grade range (e.g., "K-12", "6-12", "9-12")
 - Brief one-sentence description
 
 Return ONLY a valid JSON array with this exact format, no other text:
@@ -91,18 +89,24 @@ Return ONLY a valid JSON array with this exact format, no other text:
     "grade_range": "K-12",
     "brief_description": "One sentence about the school"
   }}
-]"""
+]
+
+Do not search the web, just use your existing knowledge."""
 
     try:
-        # Use deepseek model which is faster and cheaper, without tools
+        # Use gemini which is reliable and fast
         response = client.chat.completions.create(
-            model="deepseek",
+            model="gemini-2.5-pro",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5
         )
         
         content = response.choices[0].message.content
-        print(f"[AI Response] {content[:200]}...")
+        if not content:
+            print("[Error] Empty response from AI")
+            return []
+            
+        print(f"[AI Response] {content[:300]}...")
         
         # Extract JSON from response
         try:
@@ -129,7 +133,7 @@ def get_school_details(school_name: str) -> Dict:
     print(f"[Search] Getting details for school: {school_name}")
     
     # Use direct chat to get school information
-    prompt = f"""Provide comprehensive information about {school_name}.
+    prompt = f"""Based on your knowledge, provide comprehensive information about {school_name}.
 
 Return a JSON object with this structure:
 {{
@@ -139,7 +143,7 @@ Return a JSON object with this structure:
   "description": "2-3 sentence description of the school",
   "rating": "Overall rating and reputation",
   "academic_ranking": "National or state rankings if known",
-  "school_info": "Key information about the school",
+  "school_info": "Key information about the school (enrollment, founded year, campus)",
   "community": "Community and location information",
   "college_placement": "College matriculation information",
   "core_values": "Mission statement and core values",
@@ -147,17 +151,21 @@ Return a JSON object with this structure:
   "type": "Private or Public"
 }}
 
-Return valid JSON only, no other text."""
+Return valid JSON only, no other text. Do not search the web, use your existing knowledge."""
 
     try:
         response = client.chat.completions.create(
-            model="deepseek",
+            model="gemini-2.5-pro",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5
         )
         
         content = response.choices[0].message.content
-        print(f"[AI Response] {content[:200]}...")
+        if not content:
+            print("[Error] Empty response from AI")
+            return {"name": school_name, "error": "Could not retrieve details"}
+            
+        print(f"[AI Response] {content[:300]}...")
         
         try:
             # Extract JSON from response
@@ -275,7 +283,7 @@ Be informative and helpful for parents researching schools."""
         messages.append({"role": "user", "content": request.message})
         
         response = client.chat.completions.create(
-            model="deepseek",
+            model="gemini-2.5-pro",
             messages=messages,
             temperature=0.7
         )
@@ -330,7 +338,7 @@ Format your response as JSON:
 }}"""
 
         response = client.chat.completions.create(
-            model="deepseek",
+            model="gemini-2.5-pro",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
@@ -390,7 +398,7 @@ Return as JSON array:
 ]"""
 
         response = client.chat.completions.create(
-            model="deepseek",
+            model="gemini-2.5-pro",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.8
         )
@@ -508,9 +516,9 @@ Format as JSON:
   "suggestions": ["specific suggestion 1", "specific suggestion 2"]
 }}"""
 
-        # Use deepseek without web search tools
+        # Use gemini without web search tools
         response = client.chat.completions.create(
-            model="deepseek",
+            model="gemini-2.5-pro",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5
         )
