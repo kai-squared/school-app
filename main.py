@@ -69,43 +69,59 @@ def web_search(keywords: List[str], max_results: int = 5) -> dict:
         return {"error": str(e)}
 
 def search_schools_by_zip(zip_code: str, miles: int = 10) -> List[Dict]:
-    """Quick search for schools in a ZIP code area - returns minimal info."""
+    """Quick search for schools - tries web search first, falls back to AI knowledge."""
     print(f"[Search] Quick search for schools within {miles} miles of ZIP {zip_code}")
     
-    # First, do a quick web search to get school names
     search_query = f"private schools near {zip_code} within {miles} miles"
-    print(f"[Search Query] {search_query}")
     
+    # Try web search first
+    search_results = None
     try:
         search_results = web_search([search_query], max_results=5)
-        print(f"[Search Results] Got {len(search_results.get('queries', []))} query results")
-        
-        # Use AI to extract just school names and basic info quickly
-        prompt = f"""Based on these search results, extract a list of private schools near ZIP code {zip_code}.
+        if search_results and search_results.get('queries'):
+            print(f"[Web Search] Got {len(search_results.get('queries', []))} query results")
+    except Exception as e:
+        print(f"[Web Search] Failed: {e}")
+    
+    # Build prompt based on whether we have search results
+    if search_results and search_results.get('queries'):
+        prompt = f"""Based on these search results, extract private schools near ZIP code {zip_code}.
 
 Search results:
 {json.dumps(search_results, indent=2)}
 
-Return ONLY a JSON array with school names and minimal info. Keep it simple and fast:
+Return a JSON array with 8-10 schools:
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One short sentence"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "brief_description": "One short sentence"}}
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One sentence"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "brief_description": "One sentence"}}
 ]
 
-Return 8-10 schools if available. Return only valid JSON, no other text."""
+Return valid JSON only."""
+    else:
+        # Fallback to AI's training data
+        prompt = f"""Using your training data, list 8-10 well-known private schools typically within {miles} miles of ZIP code {zip_code}.
 
+Return a JSON array:
+[
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One sentence about the school"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "brief_description": "One sentence"}}
+]
+
+Return valid JSON only."""
+
+    try:
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. Extract school information from search results. Be concise."},
+                {"role": "system", "content": "You are a helpful assistant. Provide school information concisely."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3
+            temperature=0.5
         )
         
         content = response.choices[0].message.content
         if not content:
-            print("[Error] Empty response from AI")
+            print("[Error] Empty response")
             return []
             
         print(f"[AI Response] {content[:200]}...")
@@ -122,8 +138,6 @@ Return 8-10 schools if available. Return only valid JSON, no other text."""
             schools = json.loads(json_match.group())
             print(f"[Success] Found {len(schools)} schools")
             return schools[:10]
-        else:
-            print("[Error] No JSON array found")
             
     except Exception as e:
         print(f"[Error] Search failed: {e}")
@@ -133,50 +147,75 @@ Return 8-10 schools if available. Return only valid JSON, no other text."""
     return []
 
 def get_school_details(school_name: str) -> Dict:
-    """Deep search for detailed school information - only called when user clicks on a school."""
+    """Get detailed school information - tries web search first, falls back to AI knowledge."""
     print(f"[Deep Search] Getting comprehensive details for: {school_name}")
     
-    # Do multiple targeted searches for comprehensive information
+    # Try web search first
     search_keywords = [
-        f"{school_name} tuition fees admission requirements",
-        f"{school_name} academic programs ranking",
+        f"{school_name} tuition fees admission",
+        f"{school_name} academic ranking",
         f"{school_name} mission values"
     ]
     
-    print(f"[Deep Search] Searching with keywords: {search_keywords}")
-    
+    search_results = None
     try:
-        search_results = web_search(search_keywords, max_results=6)
-        print(f"[Search Results] Got results from {len(search_results.get('queries', []))} queries")
-        
-        # Use AI to compile comprehensive information
+        search_results = web_search(search_keywords, max_results=5)
+        if search_results and search_results.get('queries'):
+            print(f"[Web Search] Got results from {len(search_results.get('queries', []))} queries")
+    except Exception as e:
+        print(f"[Web Search] Failed: {e}")
+    
+    # Build prompt based on whether we have search results
+    if search_results and search_results.get('queries'):
         prompt = f"""Based on these search results about {school_name}, compile comprehensive information.
 
 Search results:
 {json.dumps(search_results, indent=2)}
 
+Return a detailed JSON object with all available information:
+{{
+  "name": "{school_name}",
+  "website": "official website URL",
+  "tuition": "Annual tuition and fees",
+  "description": "2-3 sentence description",
+  "rating": "School reputation",
+  "academic_ranking": "Rankings",
+  "school_info": "Key facts: enrollment, founded, campus",
+  "community": "Location info",
+  "college_placement": "College matriculation",
+  "core_values": "Mission and values",
+  "grade_range": "Grades served",
+  "type": "Private or Public"
+}}
+
+Return valid JSON only."""
+    else:
+        # Fallback to AI's training data
+        prompt = f"""Using your training data, provide comprehensive information about {school_name}.
+
 Return a detailed JSON object:
 {{
   "name": "{school_name}",
-  "website": "official website URL if found",
-  "tuition": "Annual tuition range and fees",
+  "website": "official website if known",
+  "tuition": "Typical annual tuition range",
   "description": "2-3 sentence description of the school",
-  "rating": "School reputation and ratings",
-  "academic_ranking": "Rankings (national, state, or local)",
-  "school_info": "Key facts: enrollment, founded year, campus size, facilities",
-  "community": "Location and community information",
-  "college_placement": "College matriculation and acceptance information",
-  "core_values": "Mission statement and core values",
+  "rating": "School's reputation and standing",
+  "academic_ranking": "Known rankings or recognition",
+  "school_info": "Key facts: enrollment size, founded year, campus",
+  "community": "Location and community context",
+  "college_placement": "Typical college matriculation",
+  "core_values": "Mission statement and values",
   "grade_range": "Grade levels served",
   "type": "Private or Public"
 }}
 
-Extract accurate information from the search results. Return valid JSON only."""
+Be specific where possible. Return valid JSON only."""
 
+    try:
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. Extract and compile school information from search results accurately."},
+                {"role": "system", "content": "You are a helpful assistant providing school information. Be accurate and specific."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3
@@ -184,7 +223,7 @@ Extract accurate information from the search results. Return valid JSON only."""
         
         content = response.choices[0].message.content
         if not content:
-            print("[Error] Empty response from AI")
+            print("[Error] Empty response")
             return {"name": school_name, "error": "Could not retrieve details"}
             
         print(f"[AI Response] {content[:200]}...")
@@ -199,17 +238,15 @@ Extract accurate information from the search results. Return valid JSON only."""
         json_match = re.search(r'\{[\s\S]*\}', content)
         if json_match:
             details = json.loads(json_match.group())
-            print(f"[Success] Retrieved detailed info for {school_name}")
+            print(f"[Success] Retrieved info for {school_name}")
             return details
-        else:
-            print("[Error] No JSON found in response")
             
     except Exception as e:
-        print(f"[Error] Deep search failed: {e}")
+        print(f"[Error] Failed: {e}")
         import traceback
         traceback.print_exc()
     
-    return {"name": school_name, "error": "Could not retrieve details"}
+    return {"name": school_name, "description": "Information not available", "type": "Private"}
 
 # ===== REQUEST/RESPONSE MODELS =====
 
