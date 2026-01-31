@@ -1028,6 +1028,26 @@ body {
     font-weight: 600;
 }
 
+.school-card-meta {
+    font-size: 13px;
+    color: #666;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.school-card-meta a {
+    color: #667eea;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.school-card-meta a:hover {
+    color: #764ba2;
+    text-decoration: underline;
+}
+
 .school-card-actions {
     display: flex;
     gap: 8px;

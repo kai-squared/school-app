@@ -90,10 +90,10 @@ def search_schools_by_zip(zip_code: str, miles: int = 10) -> List[Dict]:
 Search results:
 {json.dumps(search_results, indent=2)}
 
-Return a JSON array with 8-10 schools:
+Return a JSON array with 8-10 schools. Include address and website if available:
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One sentence"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "brief_description": "One sentence"}}
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "brief_description": "One sentence"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "brief_description": "One sentence"}}
 ]
 
 Return valid JSON only."""
@@ -101,10 +101,10 @@ Return valid JSON only."""
         # Fallback to AI's training data
         prompt = f"""Using your training data, list 8-10 well-known private schools typically within {miles} miles of ZIP code {zip_code}.
 
-Return a JSON array:
+Return a JSON array with address and website:
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One sentence about the school"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "brief_description": "One sentence"}}
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "brief_description": "One sentence about the school"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "brief_description": "One sentence"}}
 ]
 
 Return valid JSON only."""
@@ -169,10 +169,10 @@ def search_schools_by_location(location: str, location_type: str = "city") -> Li
 Search results:
 {json.dumps(search_results, indent=2)}
 
-Return a JSON array with 8-12 schools:
+Return a JSON array with 8-12 schools. Include address and website if available:
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One sentence"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "brief_description": "One sentence"}}
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "brief_description": "One sentence"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "brief_description": "One sentence"}}
 ]
 
 Return valid JSON only."""
@@ -180,10 +180,10 @@ Return valid JSON only."""
         # Fallback to AI knowledge
         prompt = f"""Using your training data, list 8-12 well-known private schools in {location}.
 
-Return a JSON array:
+Return a JSON array with address and website:
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "brief_description": "One sentence about the school"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "brief_description": "One sentence"}}
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "brief_description": "One sentence about the school"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "brief_description": "One sentence"}}
 ]
 
 Return valid JSON only."""

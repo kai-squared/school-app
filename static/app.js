@@ -385,8 +385,9 @@ function createSchoolCard(school, expanded = false) {
                     ${!expanded ? `<button class="icon-btn" onclick="loadSchoolDetails('${school.name.replace(/'/g, "\\'")}')">ℹ️</button>` : ''}
                 </div>
             </div>
+            ${school.address ? `<div class="school-card-meta">📍 ${school.address}</div>` : ''}
+            ${school.website ? `<div class="school-card-meta">🌐 <a href="${school.website}" target="_blank" onclick="event.stopPropagation()">${school.website}</a></div>` : ''}
             <div class="school-card-description">${school.brief_description || school.description || ''}</div>
-            ${expanded && school.website ? `<div class="detail-item"><div class="detail-label">🌐 Website</div><div class="detail-value"><a href="${school.website}" target="_blank">${school.website}</a></div></div>` : ''}
             ${expanded ? `
                 <div class="school-card-details expanded">
                     ${school.tuition ? `<div class="detail-item"><div class="detail-label">💰 Tuition</div><div class="detail-value">${school.tuition}</div></div>` : ''}
@@ -468,8 +469,11 @@ function toggleWatchlist(schoolName, schoolData) {
         addToWatchlist(school);
     }
     
-    // Refresh current view
-    performSearch();
+    // Update button state without refreshing search
+    const button = event.target;
+    const isNowInWatchlist = state.watchlist.some(s => s.name === schoolName);
+    button.textContent = isNowInWatchlist ? '✓' : '+';
+    button.classList.toggle('added', isNowInWatchlist);
 }
 
 async function sendChatMessage() {
