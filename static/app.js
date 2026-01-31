@@ -325,13 +325,13 @@ function createSchoolCard(school, expanded = false) {
             ${expanded && school.website ? `<div class="detail-item"><div class="detail-label">Website</div><div class="detail-value"><a href="${school.website}" target="_blank">${school.website}</a></div></div>` : ''}
             ${expanded ? `
                 <div class="school-card-details expanded">
-                    ${school.tuition ? `<div class="detail-item"><div class="detail-label">💰 Tuition (费用)</div><div class="detail-value">${school.tuition}</div></div>` : ''}
-                    ${school.official_data ? `<div class="detail-item"><div class="detail-label">📊 Official Data (官方数据)</div><div class="detail-value">${school.official_data}</div></div>` : ''}
-                    ${school.rating ? `<div class="detail-item"><div class="detail-label">⭐ Rating (学校评价)</div><div class="detail-value">${school.rating}</div></div>` : ''}
-                    ${school.academic_ranking ? `<div class="detail-item"><div class="detail-label">🏆 Academic Ranking (学术排名)</div><div class="detail-value">${school.academic_ranking}</div></div>` : ''}
-                    ${school.community ? `<div class="detail-item"><div class="detail-label">🏘️ Community (社区)</div><div class="detail-value">${school.community}</div></div>` : ''}
-                    ${school.college_placement ? `<div class="detail-item"><div class="detail-label">🎓 College Placement (升学)</div><div class="detail-value">${school.college_placement}</div></div>` : ''}
-                    ${school.core_values ? `<div class="detail-item"><div class="detail-label">💎 Core Values (核心价值观)</div><div class="detail-value">${school.core_values}</div></div>` : ''}
+                    ${school.tuition ? `<div class="detail-item"><div class="detail-label">💰 Tuition</div><div class="detail-value">${school.tuition}</div></div>` : ''}
+                    ${school.rating ? `<div class="detail-item"><div class="detail-label">⭐ Rating</div><div class="detail-value">${school.rating}</div></div>` : ''}
+                    ${school.academic_ranking ? `<div class="detail-item"><div class="detail-label">🏆 Academic Ranking</div><div class="detail-value">${school.academic_ranking}</div></div>` : ''}
+                    ${school.school_info ? `<div class="detail-item"><div class="detail-label">ℹ️ School Information</div><div class="detail-value">${school.school_info}</div></div>` : ''}
+                    ${school.community ? `<div class="detail-item"><div class="detail-label">🏘️ Community</div><div class="detail-value">${school.community}</div></div>` : ''}
+                    ${school.college_placement ? `<div class="detail-item"><div class="detail-label">🎓 College Placement</div><div class="detail-value">${school.college_placement}</div></div>` : ''}
+                    ${school.core_values ? `<div class="detail-item"><div class="detail-label">💎 Core Values</div><div class="detail-value">${school.core_values}</div></div>` : ''}
                 </div>
             ` : ''}
         </div>
@@ -503,7 +503,9 @@ async function analyzeAndGenerateResponse() {
         analysisContent.innerHTML = analysisHTML || '<p>Analysis complete</p>';
         
         // Display generated response
-        generatedResponse.innerHTML = analysis.suggested_response || 'No response generated';
+        generatedResponse.innerHTML = analysis.suggested_response ? 
+            analysis.suggested_response.replace(/\n\n/g, '</p><p>').replace(/^/, '<p>').replace(/$/, '</p>') : 
+            'No response generated';
         
     } catch (error) {
         analysisContent.innerHTML = `<p class="error">Error: ${error.message}</p>`;

@@ -41,9 +41,10 @@ SEARCH_API_URL = "https://space.ai-builders.com/backend/v1/search/"
 TRANSCRIPTION_API_URL = "https://space.ai-builders.com/backend/v1/audio/transcriptions"
 
 # Initialize OpenAI client with custom base URL
+# The AI Builders Space backend expects /v1/chat/completions
 client = OpenAI(
     api_key=API_KEY,
-    base_url="https://space.ai-builders.com/backend"
+    base_url="https://space.ai-builders.com/backend/v1"
 )
 
 # ===== HELPER FUNCTIONS =====
@@ -69,46 +70,57 @@ def web_search(keywords: List[str], max_results: int = 5) -> dict:
 
 def search_schools_by_zip(zip_code: str) -> List[Dict]:
     """Search for top 10 schools in a ZIP code area."""
-    print(f"[Search] Searching for top 10 schools in ZIP {zip_code}")
+    print(f"[Search] Searching for schools near ZIP {zip_code}")
     
-    # Search for schools in this ZIP code
-    search_results = web_search([f"top rated schools in {zip_code} area", f"best private schools {zip_code}"], max_results=8)
-    
-    # Use AI to extract school names and basic info
-    prompt = f"""Based on the following search results, extract the top 10 schools (if available) in ZIP code {zip_code}.
-    
-Search results:
-{json.dumps(search_results, indent=2)}
+    # Use direct chat without tools to avoid search rate limits
+    prompt = f"""You are a helpful assistant that knows about private schools in the United States.
 
-Return a JSON array of schools with this format:
+List 8-10 well-known private schools within 10 miles of ZIP code {zip_code}.
+
+For each school, provide:
+- School name (official name)
+- Type (Private/Public)
+- Grade range (e.g., "K-12", "6-12")
+- Brief one-sentence description
+
+Return ONLY a valid JSON array with this exact format, no other text:
 [
   {{
     "name": "School Name",
-    "type": "Private/Public",
+    "type": "Private",
     "grade_range": "K-12",
-    "brief_description": "One sentence description"
+    "brief_description": "One sentence about the school"
   }}
-]
+]"""
 
-Only return valid JSON array, no additional text."""
-
-    response = client.chat.completions.create(
-        model="supermind-agent-v1",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3
-    )
-    
-    content = response.choices[0].message.content
-    
-    # Extract JSON from response
     try:
-        # Try to find JSON array in the response
-        json_match = re.search(r'\[[\s\S]*\]', content)
-        if json_match:
-            schools = json.loads(json_match.group())
-            return schools[:10]  # Return top 10
-    except:
-        pass
+        # Use deepseek model which is faster and cheaper, without tools
+        response = client.chat.completions.create(
+            model="deepseek",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5
+        )
+        
+        content = response.choices[0].message.content
+        print(f"[AI Response] {content[:200]}...")
+        
+        # Extract JSON from response
+        try:
+            # Try to find JSON array in the response
+            json_match = re.search(r'\[[\s\S]*\]', content)
+            if json_match:
+                schools = json.loads(json_match.group())
+                print(f"[Success] Found {len(schools)} schools")
+                return schools[:10]  # Return top 10
+            else:
+                print("[Error] No JSON array found in response")
+        except Exception as e:
+            print(f"[Error] Parsing JSON: {e}")
+            print(f"Content: {content}")
+    except Exception as e:
+        print(f"[Error] Calling AI API: {e}")
+        import traceback
+        traceback.print_exc()
     
     return []
 
@@ -116,57 +128,53 @@ def get_school_details(school_name: str) -> Dict:
     """Get detailed information about a specific school."""
     print(f"[Search] Getting details for school: {school_name}")
     
-    # Search for comprehensive school information
-    search_keywords = [
-        f"{school_name} tuition fees admission",
-        f"{school_name} ranking academic programs",
-        f"{school_name} core values mission",
-        f"{school_name} official website information"
-    ]
-    
-    search_results = web_search(search_keywords, max_results=8)
-    
-    # Use AI to compile detailed information
-    prompt = f"""Based on the following search results about {school_name}, compile comprehensive information.
-
-Search results:
-{json.dumps(search_results, indent=2)}
+    # Use direct chat to get school information
+    prompt = f"""Provide comprehensive information about {school_name}.
 
 Return a JSON object with this structure:
 {{
   "name": "{school_name}",
-  "website": "official website URL",
-  "tuition": "费用信息 (annual costs)",
-  "description": "学校介绍 (2-3 sentences)",
-  "official_data": "官方数据 (enrollment, founded year, etc)",
-  "rating": "学校评价 (overall rating and reviews)",
-  "academic_ranking": "学术排名 (national/state rankings)",
-  "school_info": "私校信息 (private school specific info)",
-  "community": "社区信息 (community and location)",
-  "college_placement": "升学情况 (college matriculation)",
-  "core_values": "核心价值观 (mission and values)",
-  "grade_range": "年级范围",
-  "type": "Public/Private"
+  "website": "official website URL if known",
+  "tuition": "Annual tuition and fees information",
+  "description": "2-3 sentence description of the school",
+  "rating": "Overall rating and reputation",
+  "academic_ranking": "National or state rankings if known",
+  "school_info": "Key information about the school",
+  "community": "Community and location information",
+  "college_placement": "College matriculation information",
+  "core_values": "Mission statement and core values",
+  "grade_range": "Grade levels served",
+  "type": "Private or Public"
 }}
 
-Return valid JSON only."""
+Return valid JSON only, no other text."""
 
-    response = client.chat.completions.create(
-        model="supermind-agent-v1",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3
-    )
-    
-    content = response.choices[0].message.content
-    
     try:
-        # Extract JSON from response
-        json_match = re.search(r'\{[\s\S]*\}', content)
-        if json_match:
-            details = json.loads(json_match.group())
-            return details
+        response = client.chat.completions.create(
+            model="deepseek",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5
+        )
+        
+        content = response.choices[0].message.content
+        print(f"[AI Response] {content[:200]}...")
+        
+        try:
+            # Extract JSON from response
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                details = json.loads(json_match.group())
+                print(f"[Success] Retrieved details for {school_name}")
+                return details
+            else:
+                print("[Error] No JSON object found in response")
+        except Exception as e:
+            print(f"[Error] Parsing JSON: {e}")
+            print(f"Content: {content}")
     except Exception as e:
-        print(f"Error parsing school details: {e}")
+        print(f"[Error] Calling AI API: {e}")
+        import traceback
+        traceback.print_exc()
     
     return {"name": school_name, "error": "Could not retrieve details"}
 
@@ -267,7 +275,7 @@ Be informative and helpful for parents researching schools."""
         messages.append({"role": "user", "content": request.message})
         
         response = client.chat.completions.create(
-            model="supermind-agent-v1",
+            model="deepseek",
             messages=messages,
             temperature=0.7
         )
@@ -277,6 +285,9 @@ Be informative and helpful for parents researching schools."""
             "response": response.choices[0].message.content
         }
     except Exception as e:
+        print(f"[Error] Chat: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "error": str(e)
@@ -286,7 +297,7 @@ Be informative and helpful for parents researching schools."""
 async def analyze_application_question(request: ApplicationQuestionRequest):
     """Analyze and answer an application question."""
     try:
-        prompt = f"""You are an expert college admissions consultant helping a student write their school application.
+        prompt = f"""You are an expert admissions consultant helping a student write their private school application.
 
 School: {request.school_name}
 School Context: {request.school_context}
@@ -297,26 +308,29 @@ Student Profile:
 Application Question:
 {request.question}
 
-Please provide:
-1. Analysis of what the question is asking for
-2. Key points to address based on the school's values and the student's profile
-3. A well-written response (300-500 words) that:
-   - Highlights relevant experiences and qualities from the student's profile
-   - Aligns with the school's core values and mission
-   - Shows genuine interest and fit
-   - Is authentic and personal
-   - Demonstrates thoughtfulness and maturity
+Write a response following these guidelines:
+1. Use written English (formal, essay-style)
+2. Write in simple, clear paragraphs that directly answer the question
+3. Support points with specific examples from the student's profile
+4. Show genuine interest and fit with the school's values
+5. Keep it authentic and thoughtful
+6. Length: 300-500 words
+7. Structure: Introduction → Body paragraphs with examples → Conclusion
+
+Also provide:
+- Brief analysis of what the question is asking
+- 3-4 key points to address
 
 Format your response as JSON:
 {{
-  "analysis": "What the question is really asking",
-  "key_points": ["point 1", "point 2", "point 3"],
-  "suggested_response": "The full essay response here",
-  "tips": ["tip 1", "tip 2"]
+  "analysis": "Brief explanation of what the question seeks to understand",
+  "key_points": ["point 1", "point 2", "point 3", "point 4"],
+  "suggested_response": "The full written response in essay format with clear paragraphs. Use \\n\\n for paragraph breaks.",
+  "tips": ["writing tip 1", "writing tip 2"]
 }}"""
 
         response = client.chat.completions.create(
-            model="supermind-agent-v1",
+            model="deepseek",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
@@ -360,7 +374,7 @@ School Context: {request.school_context}
 Student Profile:
 {json.dumps(request.student_profile, indent=2)}
 
-Consider the school's values, the student's background, and typical private school interview questions.
+Consider the school's values and typical private school interview questions.
 Include a mix of:
 - Questions about academic interests
 - Questions about personal qualities and character
@@ -376,7 +390,7 @@ Return as JSON array:
 ]"""
 
         response = client.chat.completions.create(
-            model="supermind-agent-v1",
+            model="deepseek",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.8
         )
@@ -400,6 +414,9 @@ Return as JSON array:
         }
         
     except Exception as e:
+        print(f"[Error] Question generation: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "error": str(e)
@@ -453,46 +470,47 @@ async def get_interview_feedback(request: TranscriptionRequest):
     try:
         prompt = f"""You are an expert interview coach evaluating a student's interview response.
 
-Question: {request.question}
+Question Asked: {request.question}
 
 School Context: {request.school_context}
 
 Student Profile:
 {json.dumps(request.student_profile, indent=2)}
 
-Student's Response (transcribed):
+Student's Transcribed Response:
 {request.transcription}
 
 Provide detailed feedback on:
-1. Grammar and clarity
-2. Relevance to the question
-3. Alignment with school values
-4. Strengths of the response
-5. Areas for improvement
-6. Specific suggestions
+1. Grammar and clarity - Is the response well-articulated?
+2. Relevance to the question - Does it actually answer what was asked?
+3. Alignment with school values - Does it show understanding of the school?
+4. What the student did well
+5. Specific areas to improve
+6. Actionable suggestions for a better response
 
 Format as JSON:
 {{
-  "overall_score": "8/10",
+  "overall_score": "X/10",
   "grammar": {{
-    "score": "9/10",
-    "feedback": "Grammar feedback here"
+    "score": "X/10",
+    "feedback": "Grammar and clarity feedback"
   }},
   "relevance": {{
-    "score": "7/10",
-    "feedback": "Relevance feedback here"
+    "score": "X/10",
+    "feedback": "How well it answers the question"
   }},
   "alignment": {{
-    "score": "8/10",
-    "feedback": "School alignment feedback here"
+    "score": "X/10",
+    "feedback": "Connection to school values"
   }},
   "strengths": ["strength 1", "strength 2"],
-  "improvements": ["improvement 1", "improvement 2"],
+  "improvements": ["area to improve 1", "area to improve 2"],
   "suggestions": ["specific suggestion 1", "specific suggestion 2"]
 }}"""
 
+        # Use deepseek without web search tools
         response = client.chat.completions.create(
-            model="supermind-agent-v1",
+            model="deepseek",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5
         )
@@ -519,6 +537,9 @@ Format as JSON:
         }
         
     except Exception as e:
+        print(f"[Error] Feedback generation: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "error": str(e)
