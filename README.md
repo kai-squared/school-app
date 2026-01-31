@@ -1,21 +1,26 @@
-# AI Agent Chat Application
+# School Application Helper
 
-A beautiful, modern web-based chat application powered by FastAPI and an AI agent with web search and page reading capabilities.
+An AI-powered assistant for US PK-12 school applications, helping students search for schools, write compelling applications, and prepare for interviews.
 
 ## Features
 
-### AI Agent Capabilities
-- Web Search: Real-time web search using internal search API
-- Page Reading: Extract and read content from any web page
-- Multi-step Reasoning: Agentic loop that can chain multiple tool calls
-- Smart Tool Selection: LLM automatically decides when to use tools
+### 1. 🔍 School Search
+- Search schools by ZIP code or exact name
+- Get detailed school information and rankings
+- Chat with AI to learn more about specific schools
+- Save school information for application writing
 
-### Chat Interface
-- Beautiful Modern UI: Gradient backgrounds and smooth animations
-- Chat History Panel: Manage multiple conversations
-- Thinking Animation: Visual feedback while the agent is processing
-- Message Persistence: Chat history saved in browser localStorage
-- Responsive Design: Works on desktop and mobile
+### 2. ✍️ Application Writer
+- Save and manage student profile
+- Generate personalized responses to application questions
+- Leverage school-specific information and values
+- Get AI assistance tailored to your background
+
+### 3. 🎤 Interview Preparation
+- Generate tailored interview questions based on student profile and school
+- Record up to 60-second audio responses
+- Automatic transcription of your answers
+- AI feedback on grammar, relevance, and alignment with school values
 
 ## Running the Application
 
@@ -28,24 +33,32 @@ uvicorn main:app --reload
 
 The application will be available at http://localhost:8000
 
-## Usage
+## Technology Stack
 
-### Web Interface
+- **Backend**: FastAPI with OpenAI-compatible AI agent
+- **Frontend**: Modern HTML, CSS, JavaScript
+- **AI Model**: supermind-agent-v1 (with built-in web search)
+- **API**: AI Builders Space Backend (https://space.ai-builders.com/backend)
 
-1. Open your browser and navigate to http://localhost:8000
-2. Try asking questions like:
-   - "Who won the Super Bowl?"
-   - "What's the weather in Paris?"
-   - "Search for the latest Python release, then read the changelog"
+## Current Status
 
-### API Endpoints
+**Skeleton Implementation Complete** ✅
 
-POST /chat - Send a message to the AI agent
-GET /docs - Interactive API documentation
-GET /openapi.json - OpenAPI schema at http://localhost:8000/openapi.json
+The UI and navigation are fully functional with placeholder implementations for:
+- School search with chat interface
+- Application question writer with profile management
+- Interview prep with audio recording and transcription
+- Navigation between all three sections
 
-## Architecture
+**Next Steps**: Implement actual API integrations for each feature.
 
-Frontend: HTML, CSS, JavaScript in /static folder
-Backend: FastAPI with OpenAI integration and tool system
-Base URL: http://localhost:8000/
+## API Endpoints
+
+The app uses the following AI Builders Space APIs:
+- `/v1/chat/completions` - Chat and question generation
+- `/v1/search/` - School search functionality  
+- `/v1/audio/transcriptions` - Audio transcription
+
+## License
+
+This project is for educational purposes.

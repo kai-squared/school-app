@@ -3,58 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Agent Chat</title>
+    <title>School Application Helper - AI-Powered PK-12 Application Assistant</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container">
         <div class="sidebar">
             <div class="sidebar-header">
-                <h2>Chat History</h2>
-                <button id="newChatBtn" class="new-chat-btn">+ New Chat</button>
+                <h2>📚 School Helper</h2>
+                <p class="app-tagline">Your AI assistant for US PK-12 applications</p>
             </div>
-            <div id="chatHistory" class="chat-history">
-                <!-- Chat history items will be added here -->
+            
+            <nav class="navigation">
+                <button class="nav-item active" data-section="search">
+                    <span class="nav-icon">🔍</span>
+                    <span class="nav-label">School Search</span>
+                </button>
+                <button class="nav-item" data-section="application">
+                    <span class="nav-icon">✍️</span>
+                    <span class="nav-label">Application Writer</span>
+                </button>
+                <button class="nav-item" data-section="interview">
+                    <span class="nav-icon">🎤</span>
+                    <span class="nav-label">Interview Prep</span>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="student-profile-summary" id="profileSummary">
+                    <h4>Student Profile</h4>
+                    <p class="no-profile">No profile set</p>
+                </div>
             </div>
         </div>
         
-        <div class="main-chat">
-            <div class="chat-header">
-                <h1>AI Agent with Web Search</h1>
-                <p class="subtitle">Ask me anything - I can search the web and read pages!</p>
-            </div>
-            
-            <div id="chatMessages" class="chat-messages">
-                <div class="welcome-message">
-                    <h2>👋 Welcome!</h2>
-                    <p>I'm an AI agent with access to:</p>
-                    <ul>
-                        <li>🔍 Web search capabilities</li>
-                        <li>📄 Page reading tools</li>
-                        <li>🤔 Multi-step reasoning</li>
-                    </ul>
-                    <p>Try asking me something like:</p>
-                    <div class="example-queries">
-                        <button class="example-query">Who won the Super Bowl?</button>
-                        <button class="example-query">What's the weather in Paris?</button>
-                        <button class="example-query">Latest Python release features</button>
+        <div class="main-content">
+            <!-- Search Section -->
+            <section id="searchSection" class="content-section active">
+                <div class="section-header">
+                    <h1>🔍 School Search</h1>
+                    <p class="subtitle">Search for schools by ZIP code or name, and chat to learn more</p>
+                </div>
+                
+                <div class="search-container">
+                    <div class="search-input-group">
+                        <input 
+                            type="text" 
+                            id="schoolSearchInput" 
+                            placeholder="Enter ZIP code (e.g., 94103) or school name..."
+                            class="search-input"
+                        />
+                        <button id="searchBtn" class="primary-btn">Search Schools</button>
+                    </div>
+                    
+                    <div id="searchResults" class="search-results">
+                        <div class="welcome-state">
+                            <div class="welcome-icon">🏫</div>
+                            <h3>Find Your Perfect School</h3>
+                            <p>Search by ZIP code to find schools in your area, or enter a specific school name</p>
+                            <div class="example-searches">
+                                <button class="example-chip">94103</button>
+                                <button class="example-chip">Phillips Academy Andover</button>
+                                <button class="example-chip">Harvard-Westlake School</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="schoolChat" class="school-chat hidden">
+                        <h3>Chat about Schools</h3>
+                        <div id="chatMessages" class="chat-messages"></div>
+                        <div class="chat-input-container">
+                            <textarea 
+                                id="chatInput" 
+                                placeholder="Ask about schools, rankings, programs..." 
+                                rows="2"
+                            ></textarea>
+                            <button id="chatSendBtn" class="send-btn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M22 2L11 13" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </section>
             
-            <div class="input-area">
-                <textarea 
-                    id="messageInput" 
-                    placeholder="Ask me anything..." 
-                    rows="1"
-                ></textarea>
-                <button id="sendBtn" class="send-btn">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-            </div>
+            <!-- Application Writer Section -->
+            <section id="applicationSection" class="content-section">
+                <div class="section-header">
+                    <h1>✍️ Application Writer</h1>
+                    <p class="subtitle">AI-powered assistance for writing compelling applications</p>
+                </div>
+                
+                <div class="application-container">
+                    <div class="profile-setup">
+                        <h3>Student Profile</h3>
+                        <textarea 
+                            id="studentProfile" 
+                            placeholder="Tell us about yourself: interests, achievements, goals, extracurriculars..."
+                            rows="6"
+                            class="profile-textarea"
+                        ></textarea>
+                        <button id="saveProfileBtn" class="primary-btn">Save Profile</button>
+                    </div>
+                    
+                    <div class="application-workspace">
+                        <h3>Application Question</h3>
+                        <textarea 
+                            id="applicationQuestion" 
+                            placeholder="Paste the application question here..."
+                            rows="4"
+                            class="question-textarea"
+                        ></textarea>
+                        
+                        <div class="school-context">
+                            <h4>Selected School</h4>
+                            <div id="selectedSchool" class="school-context-box">
+                                <p class="no-selection">No school selected. Search for a school first.</p>
+                            </div>
+                        </div>
+                        
+                        <button id="generateResponseBtn" class="primary-btn" disabled>
+                            Generate Response
+                        </button>
+                        
+                        <div id="applicationResponse" class="response-area hidden">
+                            <h3>AI-Generated Response</h3>
+                            <div id="generatedText" class="generated-text"></div>
+                            <div class="response-actions">
+                                <button class="secondary-btn">Refine</button>
+                                <button class="secondary-btn">Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Interview Prep Section -->
+            <section id="interviewSection" class="content-section">
+                <div class="section-header">
+                    <h1>🎤 Interview Preparation</h1>
+                    <p class="subtitle">Practice with AI-generated questions and get feedback</p>
+                </div>
+                
+                <div class="interview-container">
+                    <div class="interview-setup">
+                        <div class="setup-item">
+                            <h4>Selected School</h4>
+                            <div id="interviewSchool" class="school-selector">
+                                <p class="no-selection">No school selected</p>
+                            </div>
+                        </div>
+                        
+                        <button id="generateQuestionsBtn" class="primary-btn" disabled>
+                            Generate Interview Questions
+                        </button>
+                    </div>
+                    
+                    <div id="interviewQuestions" class="questions-container hidden">
+                        <h3>Practice Questions</h3>
+                        <div id="questionsList" class="questions-list"></div>
+                    </div>
+                    
+                    <div id="recordingArea" class="recording-area hidden">
+                        <div class="current-question">
+                            <h3>Current Question</h3>
+                            <p id="currentQuestion" class="question-text"></p>
+                        </div>
+                        
+                        <div class="recorder">
+                            <div class="timer" id="recordTimer">0:00 / 1:00</div>
+                            <button id="recordBtn" class="record-btn">
+                                <span class="record-icon">⏺</span>
+                                <span class="record-label">Start Recording</span>
+                            </button>
+                            <p class="recording-hint">Record up to 60 seconds</p>
+                        </div>
+                        
+                        <div id="transcriptionArea" class="transcription-area hidden">
+                            <h4>Your Response (Transcribed)</h4>
+                            <div id="transcriptionText" class="transcription-text"></div>
+                            
+                            <div id="feedback" class="feedback-container">
+                                <h4>AI Feedback</h4>
+                                <div id="feedbackContent" class="feedback-content"></div>
+                            </div>
+                            
+                            <button class="secondary-btn" id="nextQuestionBtn">Next Question</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>
     

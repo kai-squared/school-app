@@ -1,289 +1,426 @@
 const API_BASE_URL = 'http://localhost:8000';
 
-// Store chat sessions
-let chats = [];
-let currentChatId = null;
-let isWaitingForResponse = false;
+// Application state
+const state = {
+    studentProfile: null,
+    selectedSchool: null,
+    interviewQuestions: [],
+    currentQuestionIndex: 0,
+    mediaRecorder: null,
+    recordingChunks: [],
+    recordingStartTime: null
+};
 
-// Initialize
+// Initialize app
 document.addEventListener('DOMContentLoaded', () => {
-    loadChatsFromStorage();
-    setupEventListeners();
-    
-    // If no chats exist, create a new one
-    if (chats.length === 0) {
-        createNewChat();
-    } else {
-        // Load the most recent chat
-        loadChat(chats[0].id);
-    }
+    setupNavigation();
+    setupSearchSection();
+    setupApplicationSection();
+    setupInterviewSection();
+    loadStoredProfile();
 });
 
-function setupEventListeners() {
-    const sendBtn = document.getElementById('sendBtn');
-    const messageInput = document.getElementById('messageInput');
-    const newChatBtn = document.getElementById('newChatBtn');
-    
-    sendBtn.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-    
-    // Auto-resize textarea
-    messageInput.addEventListener('input', () => {
-        messageInput.style.height = 'auto';
-        messageInput.style.height = messageInput.scrollHeight + 'px';
-    });
-    
-    newChatBtn.addEventListener('click', createNewChat);
-    
-    // Example query buttons
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('example-query')) {
-            messageInput.value = e.target.textContent;
-            sendMessage();
-        }
-    });
-}
-
-function createNewChat() {
-    const chat = {
-        id: Date.now().toString(),
-        title: 'New Chat',
-        messages: [],
-        createdAt: new Date().toISOString()
-    };
-    
-    chats.unshift(chat);
-    saveChatsToStorage();
-    loadChat(chat.id);
-    renderChatHistory();
-}
-
-function loadChat(chatId) {
-    currentChatId = chatId;
-    const chat = chats.find(c => c.id === chatId);
-    
-    if (!chat) return;
-    
-    const chatMessages = document.getElementById('chatMessages');
-    chatMessages.innerHTML = '';
-    
-    if (chat.messages.length === 0) {
-        // Show welcome message
-        chatMessages.innerHTML = `
-            <div class="welcome-message">
-                <h2>👋 Welcome!</h2>
-                <p>I'm an AI agent with access to:</p>
-                <ul>
-                    <li>🔍 Web search capabilities</li>
-                    <li>📄 Page reading tools</li>
-                    <li>🤔 Multi-step reasoning</li>
-                </ul>
-                <p>Try asking me something like:</p>
-                <div class="example-queries">
-                    <button class="example-query">Who won the Super Bowl?</button>
-                    <button class="example-query">What's the weather in Paris?</button>
-                    <button class="example-query">Latest Python release features</button>
-                </div>
-            </div>
-        `;
-    } else {
-        // Render all messages
-        chat.messages.forEach(msg => {
-            appendMessage(msg.role, msg.content, false);
+// Navigation
+function setupNavigation() {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const section = item.dataset.section;
+            switchSection(section);
         });
-    }
-    
-    renderChatHistory();
-    scrollToBottom();
+    });
 }
 
-function renderChatHistory() {
-    const chatHistory = document.getElementById('chatHistory');
-    chatHistory.innerHTML = '';
-    
-    chats.forEach(chat => {
-        const item = document.createElement('div');
-        item.className = 'history-item';
-        if (chat.id === currentChatId) {
+function switchSection(sectionName) {
+    // Update navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.section === sectionName) {
             item.classList.add('active');
         }
-        
-        const title = document.createElement('div');
-        title.className = 'history-item-title';
-        title.textContent = chat.title;
-        
-        const preview = document.createElement('div');
-        preview.className = 'history-item-preview';
-        if (chat.messages.length > 0) {
-            preview.textContent = chat.messages[0].content.substring(0, 50) + '...';
-        } else {
-            preview.textContent = 'No messages yet';
+    });
+    
+    // Update content
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.remove('active');
+    });
+    document.getElementById(`${sectionName}Section`).classList.add('active');
+}
+
+// ===== SEARCH SECTION =====
+function setupSearchSection() {
+    const searchBtn = document.getElementById('searchBtn');
+    const searchInput = document.getElementById('schoolSearchInput');
+    const exampleChips = document.querySelectorAll('.example-chip');
+    
+    searchBtn.addEventListener('click', performSearch);
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            performSearch();
         }
-        
-        item.appendChild(title);
-        item.appendChild(preview);
-        item.addEventListener('click', () => loadChat(chat.id));
-        
-        chatHistory.appendChild(item);
+    });
+    
+    exampleChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            searchInput.value = chip.textContent;
+            performSearch();
+        });
+    });
+    
+    // Chat functionality
+    const chatSendBtn = document.getElementById('chatSendBtn');
+    const chatInput = document.getElementById('chatInput');
+    
+    chatSendBtn.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendChatMessage();
+        }
     });
 }
 
-async function sendMessage() {
-    if (isWaitingForResponse) return;
+async function performSearch() {
+    const searchInput = document.getElementById('schoolSearchInput');
+    const query = searchInput.value.trim();
     
-    const messageInput = document.getElementById('messageInput');
-    const message = messageInput.value.trim();
+    if (!query) return;
+    
+    const resultsContainer = document.getElementById('searchResults');
+    resultsContainer.innerHTML = '<div class="loading">🔍 Searching for schools...</div>';
+    
+    try {
+        // TODO: Call the actual search API
+        // For now, show placeholder
+        setTimeout(() => {
+            resultsContainer.innerHTML = `
+                <div class="search-result-item">
+                    <h4>📚 Search functionality will be implemented</h4>
+                    <p>Query: ${query}</p>
+                    <p class="note">This will search schools by ZIP code or name using the AI agent</p>
+                </div>
+            `;
+            
+            // Show chat section
+            document.getElementById('schoolChat').classList.remove('hidden');
+        }, 1000);
+        
+    } catch (error) {
+        resultsContainer.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+    }
+}
+
+async function sendChatMessage() {
+    const chatInput = document.getElementById('chatInput');
+    const message = chatInput.value.trim();
     
     if (!message) return;
     
-    // Clear input
-    messageInput.value = '';
-    messageInput.style.height = 'auto';
+    const chatMessages = document.getElementById('chatMessages');
     
     // Add user message
-    appendMessage('user', message);
-    addMessageToCurrentChat('user', message);
+    appendChatMessage('user', message);
+    chatInput.value = '';
     
-    // Update chat title if this is the first message
-    const chat = chats.find(c => c.id === currentChatId);
-    if (chat && chat.messages.length === 1) {
-        chat.title = message.substring(0, 50) + (message.length > 50 ? '...' : '');
-        saveChatsToStorage();
-        renderChatHistory();
-    }
-    
-    // Show thinking animation
-    showThinking();
-    isWaitingForResponse = true;
-    document.getElementById('sendBtn').disabled = true;
+    // Add thinking indicator
+    appendChatMessage('assistant', '🤔 Thinking...');
     
     try {
-        // Call API
-        const response = await fetch(`${API_BASE_URL}/chat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                user_message: message
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to get response');
-        }
-        
-        const data = await response.json();
-        
-        // Remove thinking animation
-        hideThinking();
-        
-        // Add assistant message
-        appendMessage('assistant', data.content);
-        addMessageToCurrentChat('assistant', data.content);
+        // TODO: Call the actual chat API
+        // For now, show placeholder
+        setTimeout(() => {
+            removeLast AI message();
+            appendChatMessage('assistant', 'Chat functionality will be implemented. This will use the AI agent to answer questions about schools.');
+        }, 1500);
         
     } catch (error) {
-        hideThinking();
-        appendMessage('assistant', `Sorry, I encountered an error: ${error.message}`);
-        addMessageToCurrentChat('assistant', `Sorry, I encountered an error: ${error.message}`);
-    } finally {
-        isWaitingForResponse = false;
-        document.getElementById('sendBtn').disabled = false;
-        messageInput.focus();
+        console.error('Chat error:', error);
     }
 }
 
-function appendMessage(role, content, shouldScroll = true) {
+function appendChatMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
-    
-    // Remove welcome message if it exists
-    const welcomeMessage = chatMessages.querySelector('.welcome-message');
-    if (welcomeMessage) {
-        welcomeMessage.remove();
-    }
-    
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${role}`;
-    
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-    avatar.textContent = role === 'user' ? '👤' : '🤖';
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    contentDiv.textContent = content;
-    
-    messageDiv.appendChild(avatar);
-    messageDiv.appendChild(contentDiv);
-    
-    chatMessages.appendChild(messageDiv);
-    
-    if (shouldScroll) {
-        scrollToBottom();
-    }
-}
-
-function showThinking() {
-    const chatMessages = document.getElementById('chatMessages');
-    
-    const thinkingDiv = document.createElement('div');
-    thinkingDiv.className = 'message assistant thinking';
-    thinkingDiv.id = 'thinkingMessage';
-    
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-    avatar.textContent = '🤖';
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    contentDiv.innerHTML = `
-        <span>Thinking</span>
-        <div class="thinking-dots">
-            <div class="thinking-dot"></div>
-            <div class="thinking-dot"></div>
-            <div class="thinking-dot"></div>
+    messageDiv.className = `chat-message ${role}`;
+    messageDiv.innerHTML = `
+        <div class="message-content">
+            <strong>${role === 'user' ? '👤 You' : '🤖 Assistant'}:</strong>
+            <p>${content}</p>
         </div>
     `;
-    
-    thinkingDiv.appendChild(avatar);
-    thinkingDiv.appendChild(contentDiv);
-    
-    chatMessages.appendChild(thinkingDiv);
-    scrollToBottom();
-}
-
-function hideThinking() {
-    const thinkingMessage = document.getElementById('thinkingMessage');
-    if (thinkingMessage) {
-        thinkingMessage.remove();
-    }
-}
-
-function addMessageToCurrentChat(role, content) {
-    const chat = chats.find(c => c.id === currentChatId);
-    if (chat) {
-        chat.messages.push({ role, content });
-        saveChatsToStorage();
-    }
-}
-
-function scrollToBottom() {
-    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function saveChatsToStorage() {
-    localStorage.setItem('chats', JSON.stringify(chats));
+function removeLastAIMessage() {
+    const chatMessages = document.getElementById('chatMessages');
+    const messages = chatMessages.querySelectorAll('.chat-message.assistant');
+    if (messages.length > 0) {
+        messages[messages.length - 1].remove();
+    }
 }
 
-function loadChatsFromStorage() {
-    const stored = localStorage.getItem('chats');
+// ===== APPLICATION SECTION =====
+function setupApplicationSection() {
+    const saveProfileBtn = document.getElementById('saveProfileBtn');
+    const generateResponseBtn = document.getElementById('generateResponseBtn');
+    
+    saveProfileBtn.addEventListener('click', saveProfile);
+    generateResponseBtn.addEventListener('click', generateResponse);
+}
+
+function saveProfile() {
+    const profileText = document.getElementById('studentProfile').value.trim();
+    
+    if (!profileText) {
+        alert('Please enter your profile information');
+        return;
+    }
+    
+    state.studentProfile = profileText;
+    localStorage.setItem('studentProfile', profileText);
+    
+    // Update sidebar
+    document.querySelector('.student-profile-summary .no-profile').innerHTML = 
+        `<strong>Profile saved!</strong><br/>${profileText.substring(0, 50)}...`;
+    
+    alert('Profile saved successfully!');
+}
+
+function loadStoredProfile() {
+    const stored = localStorage.getItem('studentProfile');
     if (stored) {
-        chats = JSON.parse(stored);
+        state.studentProfile = stored;
+        document.getElementById('studentProfile').value = stored;
+        document.querySelector('.student-profile-summary .no-profile').innerHTML = 
+            `<strong>Profile loaded</strong><br/>${stored.substring(0, 50)}...`;
+    }
+}
+
+async function generateResponse() {
+    const question = document.getElementById('applicationQuestion').value.trim();
+    
+    if (!question) {
+        alert('Please enter an application question');
+        return;
+    }
+    
+    if (!state.studentProfile) {
+        alert('Please save your profile first');
+        return;
+    }
+    
+    const responseArea = document.getElementById('applicationResponse');
+    const generatedText = document.getElementById('generatedText');
+    
+    responseArea.classList.remove('hidden');
+    generatedText.innerHTML = '✨ Generating personalized response...';
+    
+    try {
+        // TODO: Call the actual API with profile, school context, and question
+        setTimeout(() => {
+            generatedText.innerHTML = `
+                <p><strong>Note:</strong> Application writing functionality will be implemented.</p>
+                <p>This will use your profile and school information to generate a personalized response to: "${question}"</p>
+            `;
+        }, 2000);
+        
+    } catch (error) {
+        generatedText.innerHTML = `Error: ${error.message}`;
+    }
+}
+
+// ===== INTERVIEW SECTION =====
+function setupInterviewSection() {
+    const generateQuestionsBtn = document.getElementById('generateQuestionsBtn');
+    const recordBtn = document.getElementById('recordBtn');
+    const nextQuestionBtn = document.getElementById('nextQuestionBtn');
+    
+    generateQuestionsBtn.addEventListener('click', generateQuestions);
+    recordBtn.addEventListener('click', toggleRecording);
+    nextQuestionBtn.addEventListener('click', loadNextQuestion);
+}
+
+async function generateQuestions() {
+    if (!state.studentProfile) {
+        alert('Please save your profile first');
+        return;
+    }
+    
+    const questionsContainer = document.getElementById('interviewQuestions');
+    const questionsList = document.getElementById('questionsList');
+    
+    questionsContainer.classList.remove('hidden');
+    questionsList.innerHTML = '<div class="loading">✨ Generating interview questions...</div>';
+    
+    try {
+        // TODO: Call the actual API to generate questions
+        setTimeout(() => {
+            const placeholderQuestions = [
+                'Why are you interested in attending our school?',
+                'Tell us about a challenge you overcame.',
+                'What are your academic interests and goals?',
+                'How do you contribute to your community?',
+                'What makes you a good fit for our school?'
+            ];
+            
+            state.interviewQuestions = placeholderQuestions;
+            state.currentQuestionIndex = 0;
+            
+            questionsList.innerHTML = '';
+            placeholderQuestions.forEach((q, index) => {
+                const item = document.createElement('div');
+                item.className = 'question-item';
+                item.innerHTML = `<strong>Q${index + 1}:</strong> ${q}`;
+                item.addEventListener('click', () => startPracticing(index));
+                questionsList.appendChild(item);
+            });
+            
+            document.getElementById('recordingArea').classList.remove('hidden');
+            loadQuestion(0);
+        }, 2000);
+        
+    } catch (error) {
+        questionsList.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+    }
+}
+
+function startPracticing(index) {
+    state.currentQuestionIndex = index;
+    loadQuestion(index);
+    document.getElementById('recordingArea').scrollIntoView({ behavior: 'smooth' });
+}
+
+function loadQuestion(index) {
+    const question = state.interviewQuestions[index];
+    document.getElementById('currentQuestion').textContent = question;
+    document.getElementById('transcriptionArea').classList.add('hidden');
+    resetRecorder();
+}
+
+function loadNextQuestion() {
+    state.currentQuestionIndex++;
+    if (state.currentQuestionIndex >= state.interviewQuestions.length) {
+        state.currentQuestionIndex = 0;
+    }
+    loadQuestion(state.currentQuestionIndex);
+}
+
+async function toggleRecording() {
+    const recordBtn = document.getElementById('recordBtn');
+    
+    if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+        stopRecording();
+    } else {
+        startRecording();
+    }
+}
+
+async function startRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        state.mediaRecorder = new MediaRecorder(stream);
+        state.recordingChunks = [];
+        state.recordingStartTime = Date.now();
+        
+        state.mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                state.recordingChunks.push(event.data);
+            }
+        };
+        
+        state.mediaRecorder.onstop = processRecording;
+        
+        state.mediaRecorder.start();
+        
+        // Update UI
+        const recordBtn = document.getElementById('recordBtn');
+        recordBtn.classList.add('recording');
+        recordBtn.querySelector('.record-icon').textContent = '⏹';
+        recordBtn.querySelector('.record-label').textContent = 'Stop Recording';
+        
+        // Start timer
+        updateTimer();
+        
+        // Auto-stop after 60 seconds
+        setTimeout(() => {
+            if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+                stopRecording();
+            }
+        }, 60000);
+        
+    } catch (error) {
+        alert('Error accessing microphone: ' + error.message);
+    }
+}
+
+function stopRecording() {
+    if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+        state.mediaRecorder.stop();
+        state.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        
+        // Update UI
+        const recordBtn = document.getElementById('recordBtn');
+        recordBtn.classList.remove('recording');
+        recordBtn.querySelector('.record-icon').textContent = '⏺';
+        recordBtn.querySelector('.record-label').textContent = 'Start Recording';
+    }
+}
+
+function updateTimer() {
+    if (!state.recordingStartTime || !state.mediaRecorder || state.mediaRecorder.state !== 'recording') {
+        return;
+    }
+    
+    const elapsed = Math.floor((Date.now() - state.recordingStartTime) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    const totalMinutes = 1;
+    const totalSeconds = 0;
+    
+    document.getElementById('recordTimer').textContent = 
+        `${minutes}:${seconds.toString().padStart(2, '0')} / ${totalMinutes}:${totalSeconds.toString().padStart(2, '0')}`;
+    
+    if (elapsed < 60) {
+        requestAnimationFrame(updateTimer);
+    }
+}
+
+function resetRecorder() {
+    document.getElementById('recordTimer').textContent = '0:00 / 1:00';
+    const recordBtn = document.getElementById('recordBtn');
+    recordBtn.classList.remove('recording');
+    recordBtn.querySelector('.record-icon').textContent = '⏺';
+    recordBtn.querySelector('.record-label').textContent = 'Start Recording';
+}
+
+async function processRecording() {
+    const audioBlob = new Blob(state.recordingChunks, { type: 'audio/webm' });
+    
+    // Show transcription area
+    document.getElementById('transcriptionArea').classList.remove('hidden');
+    document.getElementById('transcriptionText').textContent = '🎙️ Transcribing...';
+    document.getElementById('feedbackContent').textContent = '⏳ Analyzing...';
+    
+    try {
+        // TODO: Call the actual transcription API
+        setTimeout(() => {
+            document.getElementById('transcriptionText').textContent = 
+                'Transcription functionality will be implemented. This will transcribe your audio response and display it here.';
+            
+            document.getElementById('feedbackContent').innerHTML = `
+                <p><strong>Note:</strong> AI feedback will be provided on:</p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>Grammar and clarity</li>
+                    <li>Relevance to the question</li>
+                    <li>Alignment with school values</li>
+                    <li>Suggestions for improvement</li>
+                </ul>
+            `;
+        }, 2000);
+        
+    } catch (error) {
+        document.getElementById('transcriptionText').textContent = 'Error: ' + error.message;
+        document.getElementById('feedbackContent').textContent = 'Could not generate feedback.';
     }
 }

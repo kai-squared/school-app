@@ -38,9 +38,10 @@ API_KEY = os.getenv("AI_BUILDER_TOKEN") or os.getenv("SUPER_MIND_API_KEY")
 SEARCH_API_URL = "https://space.ai-builders.com/backend/v1/search/"
 
 # Initialize OpenAI client with custom base URL
+# Using the AI Builders Space backend which supports multiple models
 client = OpenAI(
     api_key=API_KEY,
-    base_url="https://space.ai-builders.com/backend/v1"
+    base_url="https://space.ai-builders.com/backend"
 )
 
 
@@ -211,8 +212,9 @@ async def chat(request: ChatRequest):
         print(f"[Turn {turn + 1}/{max_turns}]")
         
         # Make API call with current conversation history
+        # Using supermind-agent-v1 which has built-in web search capabilities
         completion = client.chat.completions.create(
-            model="gpt-5",
+            model="supermind-agent-v1",
             messages=messages,
             tools=tools,
             tool_choice="auto"
