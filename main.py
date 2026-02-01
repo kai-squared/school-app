@@ -50,130 +50,6 @@ client = OpenAI(
 
 # ===== HELPER FUNCTIONS =====
 
-def scrape_niche_schools(search_query: str, search_type: str = "zip") -> List[Dict]:
-    """
-    Scrape Niche.com for school information quickly.
-    Returns a list of schools with basic info and rankings.
-    """
-    print(f"[Niche Scrape] Searching for: {search_query} (type: {search_type})")
-    
-    try:
-        # Build Niche.com search URL
-        if search_type == "zip":
-            # For ZIP codes, search for schools in that area
-            encoded_query = urllib.parse.quote(f"{search_query}")
-            url = f"https://www.niche.com/k12/search/best-private-k12-schools/?zip={encoded_query}"
-        elif search_type == "city":
-            # For cities, search by location
-            encoded_query = urllib.parse.quote(search_query)
-            url = f"https://www.niche.com/k12/search/best-private-k12-schools/?location={encoded_query}"
-        elif search_type == "state":
-            # For states, use state-specific URL
-            state_slug = search_query.lower().replace(" ", "-")
-            url = f"https://www.niche.com/k12/search/best-private-k12-schools/s/{state_slug}/"
-        else:
-            # Direct school name search
-            encoded_query = urllib.parse.quote(search_query)
-            url = f"https://www.niche.com/k12/search/best-schools/?q={encoded_query}"
-        
-        print(f"[Niche] Fetching: {url}")
-        
-        # Add headers to mimic browser
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        schools = []
-        
-        # Find school cards - Niche uses various class names
-        # Try multiple selectors for robustness
-        school_cards = (
-            soup.find_all('li', class_=re.compile(r'search-result')) or
-            soup.find_all('div', class_=re.compile(r'search-result')) or
-            soup.find_all('div', attrs={'data-entity-type': 'school'})
-        )
-        
-        print(f"[Niche] Found {len(school_cards)} potential school cards")
-        
-        for card in school_cards[:15]:  # Limit to first 15 results
-            try:
-                school_data = {}
-                
-                # Extract school name
-                name_elem = (
-                    card.find('h2') or 
-                    card.find('h3') or
-                    card.find('a', class_=re.compile(r'(school-name|search-result__title)'))
-                )
-                if name_elem:
-                    school_data['name'] = name_elem.get_text(strip=True)
-                else:
-                    continue  # Skip if no name found
-                
-                # Extract Niche ranking/grade
-                grade_elem = card.find(class_=re.compile(r'(grade|niche-grade|badge)'))
-                if grade_elem:
-                    grade_text = grade_elem.get_text(strip=True)
-                    school_data['niche_ranking'] = grade_text
-                else:
-                    school_data['niche_ranking'] = None
-                
-                # Extract location/address
-                location_elem = card.find(class_=re.compile(r'(location|address)'))
-                if location_elem:
-                    school_data['address'] = location_elem.get_text(strip=True)
-                else:
-                    school_data['address'] = None
-                
-                # Extract grade range
-                grade_range_elem = card.find(string=re.compile(r'(K-12|PK-12|Grades|Grade)'))
-                if grade_range_elem:
-                    school_data['grade_range'] = grade_range_elem.strip()
-                else:
-                    school_data['grade_range'] = "PK-12"
-                
-                # Extract school type
-                school_data['type'] = "Private"
-                
-                # Extract website/URL
-                link_elem = card.find('a', href=True)
-                if link_elem and link_elem['href']:
-                    href = link_elem['href']
-                    if href.startswith('/'):
-                        school_data['website'] = f"https://www.niche.com{href}"
-                    else:
-                        school_data['website'] = href
-                else:
-                    school_data['website'] = None
-                
-                # Create brief description
-                desc_elem = card.find(class_=re.compile(r'(description|excerpt)'))
-                if desc_elem:
-                    school_data['brief_description'] = desc_elem.get_text(strip=True)[:200]
-                else:
-                    school_data['brief_description'] = f"Private school in the area"
-                
-                schools.append(school_data)
-                print(f"[Niche] Extracted: {school_data['name']}")
-                
-            except Exception as e:
-                print(f"[Niche] Error parsing card: {e}")
-                continue
-        
-        print(f"[Niche] Successfully extracted {len(schools)} schools")
-        return schools
-        
-    except Exception as e:
-        print(f"[Niche] Scraping failed: {e}")
-        # Return empty list on error - will fall back to AI
-        return []
-
 def web_search(keywords: List[str], max_results: int = 5) -> dict:
     """Performs a web search using the internal search API."""
     headers = {
@@ -194,38 +70,47 @@ def web_search(keywords: List[str], max_results: int = 5) -> dict:
         return {"error": str(e)}
 
 def search_schools_by_zip(zip_code: str, miles: int = 10, exclude_schools: List[str] = []) -> List[Dict]:
-    """Quick search for schools using Niche.com scraping."""
+    """Quick search for schools - single AI call with web search results."""
     print(f"[Search] Searching schools within {miles} miles of ZIP {zip_code}, excluding {len(exclude_schools)} schools")
     
-    # Try Niche scraping first
-    schools = scrape_niche_schools(zip_code, "zip")
+    # Do ONE web search query
+    search_query = f"best private schools near ZIP code {zip_code} Niche ranking address"
     
-    # Filter out excluded schools
-    if exclude_schools:
-        schools = [s for s in schools if s['name'] not in exclude_schools]
-    
-    # If we got results from Niche, return them
-    if schools:
-        print(f"[Search] Returning {len(schools)} schools from Niche")
-        return schools
-    
-    # Fallback: Try AI knowledge if Niche scraping failed
-    print(f"[Fallback] Using AI knowledge for ZIP {zip_code}")
+    try:
+        search_results = web_search([search_query], max_results=10)
+        has_results = search_results and search_results.get('queries')
+    except Exception as e:
+        print(f"[Web Search] Failed: {e}")
+        has_results = False
     
     exclude_clause = ""
     if exclude_schools:
-        exclude_clause = f"\n\nIMPORTANT: Do NOT include these schools that were already shown: {', '.join(exclude_schools)}"
+        schools_list = ', '.join(exclude_schools)
+        exclude_clause = f"\n\nEXCLUDE these schools (already shown): {schools_list}"
     
-    prompt = f"""Using your training data, list 8-10 well-known private schools typically within {miles} miles of ZIP code {zip_code}.
+    # Single AI call to extract and structure all school data
+    if has_results:
+        prompt = f"""Extract 10-15 private schools from these search results near ZIP {zip_code}.
+
+Search Results:
+{json.dumps(search_results, indent=2)}
 {exclude_clause}
 
-Return a JSON array with NEW schools (different from excluded list), including address, website, and Niche ranking:
+Return ONLY a valid JSON array (no markdown, no extra text):
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "niche_ranking": "#5 in State", "brief_description": "One sentence about the school"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "niche_ranking": "#10 in State", "brief_description": "One sentence"}}
-]
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Full Address", "website": "https://...", "niche_ranking": "A+ or #1 in State", "brief_description": "1-2 sentences"}},
+  ...
+]"""
+    else:
+        # Fallback to AI knowledge
+        prompt = f"""List 10 well-known private schools near ZIP code {zip_code}.
+{exclude_clause}
 
-Return valid JSON only."""
+Return ONLY a valid JSON array:
+[
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "City, State", "website": "https://...", "niche_ranking": "A+", "brief_description": "1-2 sentences"}},
+  ...
+]"""
 
     try:
         response = client.chat.completions.create(
@@ -266,38 +151,50 @@ Return valid JSON only."""
 
 
 def search_schools_by_location(location: str, location_type: str = "city", exclude_schools: List[str] = []) -> List[Dict]:
-    """Search for schools by city or state using Niche.com scraping."""
+    """Search for schools by city or state - single AI call with web search."""
     print(f"[Search] Searching for schools in {location_type}: {location}, excluding {len(exclude_schools)} schools")
     
-    # Try Niche scraping first
-    schools = scrape_niche_schools(location, location_type)
+    # Do ONE web search query
+    if location_type == "city":
+        search_query = f"best private schools in {location} Niche ranking address"
+    else:
+        search_query = f"top private schools in {location} state Niche ranking"
     
-    # Filter out excluded schools
-    if exclude_schools:
-        schools = [s for s in schools if s['name'] not in exclude_schools]
-    
-    # If we got results from Niche, return them
-    if schools:
-        print(f"[Search] Returning {len(schools)} schools from Niche")
-        return schools
-    
-    # Fallback: Try AI knowledge if Niche scraping failed
-    print(f"[Fallback] Using AI knowledge for {location}")
+    try:
+        search_results = web_search([search_query], max_results=12)
+        has_results = search_results and search_results.get('queries')
+    except Exception as e:
+        print(f"[Web Search] Failed: {e}")
+        has_results = False
     
     exclude_clause = ""
     if exclude_schools:
-        exclude_clause = f"\n\nIMPORTANT: Do NOT include these schools that were already shown: {', '.join(exclude_schools)}"
+        schools_list = ', '.join(exclude_schools)
+        exclude_clause = f"\n\nEXCLUDE these schools (already shown): {schools_list}"
     
-    prompt = f"""Using your training data, list 8-12 well-known private schools in {location}.
+    # Single AI call
+    if has_results:
+        prompt = f"""Extract 10-15 private schools from these search results in {location}.
+
+Search Results:
+{json.dumps(search_results, indent=2)}
 {exclude_clause}
 
-Return a JSON array with NEW schools (different from excluded list), including address, website, and Niche ranking:
+Return ONLY a valid JSON array (no markdown, no extra text):
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "niche_ranking": "#5 in State", "brief_description": "One sentence about the school"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "niche_ranking": "#10 in State", "brief_description": "One sentence"}}
-]
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Full Address", "website": "https://...", "niche_ranking": "A+ or #1 in State", "brief_description": "1-2 sentences"}},
+  ...
+]"""
+    else:
+        # Fallback to AI knowledge
+        prompt = f"""List 10-15 well-known private schools in {location}.
+{exclude_clause}
 
-Return valid JSON only."""
+Return ONLY a valid JSON array:
+[
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "City, State", "website": "https://...", "niche_ranking": "A+", "brief_description": "1-2 sentences"}},
+  ...
+]"""
 
     try:
         response = client.chat.completions.create(
