@@ -228,69 +228,64 @@ Return ONLY a valid JSON array:
     return []
 
 def get_school_details(school_name: str) -> Dict:
-    """Get detailed school information - tries web search first, falls back to AI knowledge."""
+    """Get detailed school information with comprehensive web search."""
     print(f"[Deep Search] Getting comprehensive details for: {school_name}")
     
-    # Try web search first
-    search_keywords = [
-        f"{school_name} tuition fees admission",
-        f"{school_name} academic ranking",
-        f"{school_name} mission values"
-    ]
+    # Do comprehensive web search for this specific school
+    search_query = f"{school_name} private school tuition admission ranking official website Niche rating"
     
-    search_results = None
     try:
-        search_results = web_search(search_keywords, max_results=5)
-        if search_results and search_results.get('queries'):
-            print(f"[Web Search] Got results from {len(search_results.get('queries', []))} queries")
+        search_results = web_search([search_query], max_results=8)
+        has_results = search_results and search_results.get('queries')
     except Exception as e:
         print(f"[Web Search] Failed: {e}")
+        has_results = False
     
-    # Build prompt based on whether we have search results
-    if search_results and search_results.get('queries'):
-        prompt = f"""Based on these search results about {school_name}, compile comprehensive information.
+    # Single AI call to extract comprehensive details
+    if has_results:
+        prompt = f"""Extract comprehensive details about {school_name} from these search results.
 
-Search results:
+Search Results:
 {json.dumps(search_results, indent=2)}
 
-Return a detailed JSON object with all available information:
+Return ONLY a valid JSON object (no markdown):
 {{
   "name": "{school_name}",
+  "type": "Private",
+  "grade_range": "K-12",
   "website": "official website URL",
-  "tuition": "Annual tuition and fees",
-  "description": "2-3 sentence description",
-  "rating": "School reputation",
-  "academic_ranking": "Rankings",
-  "school_info": "Key facts: enrollment, founded, campus",
-  "community": "Location info",
-  "college_placement": "College matriculation",
-  "core_values": "Mission and values",
-  "grade_range": "Grades served",
-  "type": "Private or Public"
-}}
-
-Return valid JSON only."""
+  "address": "full address",
+  "tuition": "Annual tuition with range if available (e.g., $35,000-$45,000)",
+  "rating": "Niche rating or overall rating",
+  "academic_ranking": "Academic ranking details",
+  "school_info": "Enrollment, founding year, campus details",
+  "community": "Community and diversity information",
+  "college_placement": "College matriculation statistics",
+  "core_values": "School's mission and core values",
+  "niche_ranking": "Niche grade or ranking",
+  "description": "Comprehensive 2-3 sentence description"
+}}"""
     else:
-        # Fallback to AI's training data
-        prompt = f"""Using your training data, provide comprehensive information about {school_name}.
+        # Fallback to AI knowledge
+        prompt = f"""Provide comprehensive details about {school_name} using your training data.
 
-Return a detailed JSON object:
+Return ONLY a valid JSON object:
 {{
   "name": "{school_name}",
-  "website": "official website if known",
-  "tuition": "Typical annual tuition range",
-  "description": "2-3 sentence description of the school",
-  "rating": "School's reputation and standing",
-  "academic_ranking": "Known rankings or recognition",
-  "school_info": "Key facts: enrollment size, founded year, campus",
-  "community": "Location and community context",
-  "college_placement": "Typical college matriculation",
-  "core_values": "Mission statement and values",
-  "grade_range": "Grade levels served",
-  "type": "Private or Public"
-}}
-
-Be specific where possible. Return valid JSON only."""
+  "type": "Private",
+  "grade_range": "K-12",
+  "website": "school website",
+  "address": "city, state",
+  "tuition": "Estimated annual tuition",
+  "rating": "Rating if known",
+  "academic_ranking": "Ranking details",
+  "school_info": "Key information",
+  "community": "Community description",
+  "college_placement": "College placement info",
+  "core_values": "Core values",
+  "niche_ranking": "Niche ranking if known",
+  "description": "2-3 sentence description"
+}}"""
 
     try:
         response = client.chat.completions.create(
