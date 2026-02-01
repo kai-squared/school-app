@@ -85,7 +85,7 @@ def search_schools_by_zip(zip_code: str, miles: int = 10, exclude_schools: List[
     
     exclude_clause = ""
     if exclude_schools:
-        schools_list = ', '.join(exclude_schools)
+        schools_list = ', '.join(exclude_schools[:10])  # Limit to avoid huge prompts
         exclude_clause = f"\n\nEXCLUDE these schools (already shown): {schools_list}"
     
     # Single AI call to extract and structure all school data
@@ -93,7 +93,7 @@ def search_schools_by_zip(zip_code: str, miles: int = 10, exclude_schools: List[
         prompt = f"""Extract 10-15 private schools from these search results near ZIP {zip_code}.
 
 Search Results:
-{json.dumps(search_results, indent=2)}
+{json.dumps(search_results, indent=2)[:4000]}
 {exclude_clause}
 
 Return ONLY a valid JSON array (no markdown, no extra text):
@@ -116,38 +116,67 @@ Return ONLY a valid JSON array:
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. Provide school information concisely."},
+                {"role": "system", "content": "You are a helpful assistant. Return only valid JSON arrays, no markdown."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.5
+            temperature=0.3,
+            timeout=30  # 30 second timeout
         )
         
         content = response.choices[0].message.content
         if not content:
             print("[Error] Empty response")
-            return []
+            return create_fallback_schools(zip_code)
             
         print(f"[AI Response] {content[:200]}...")
         
-        # Clean markdown
+        # More robust JSON extraction
         content = content.strip()
-        if content.startswith("```"):
-            lines = content.split('\n')
-            content = '\n'.join([line for line in lines if not line.startswith("```")])
         
-        # Extract JSON
+        # Remove markdown code blocks
+        if content.startswith("```"):
+            content = re.sub(r'```[\w]*\n', '', content)
+            content = re.sub(r'```$', '', content)
+            content = content.strip()
+        
+        # Try to find JSON array
         json_match = re.search(r'\[[\s\S]*\]', content)
         if json_match:
-            schools = json.loads(json_match.group())
-            print(f"[Success] Found {len(schools)} schools")
-            return schools[:10]
+            try:
+                schools = json.loads(json_match.group())
+                if isinstance(schools, list) and len(schools) > 0:
+                    print(f"[Success] Found {len(schools)} schools")
+                    return schools[:15]
+                else:
+                    print("[Warning] Empty or invalid school list")
+                    return create_fallback_schools(zip_code)
+            except json.JSONDecodeError as je:
+                print(f"[JSON Error] Could not parse: {je}")
+                return create_fallback_schools(zip_code)
+        else:
+            print("[Error] No JSON array found in response")
+            return create_fallback_schools(zip_code)
             
     except Exception as e:
         print(f"[Error] Search failed: {e}")
         import traceback
         traceback.print_exc()
-    
-    return []
+        return create_fallback_schools(zip_code)
+
+
+def create_fallback_schools(location: str) -> List[Dict]:
+    """Create a minimal fallback response when search fails."""
+    return [
+        {
+            "name": f"Search results unavailable for {location}",
+            "type": "Private",
+            "grade_range": "K-12",
+            "address": "Please try again or refine your search",
+            "website": None,
+            "niche_ranking": None,
+            "brief_description": "We're experiencing high demand. Please try searching again in a moment, or try a different location."
+        }
+    ]
 
 
 def search_schools_by_location(location: str, location_type: str = "city", exclude_schools: List[str] = []) -> List[Dict]:
@@ -169,7 +198,7 @@ def search_schools_by_location(location: str, location_type: str = "city", exclu
     
     exclude_clause = ""
     if exclude_schools:
-        schools_list = ', '.join(exclude_schools)
+        schools_list = ', '.join(exclude_schools[:10])  # Limit to avoid huge prompts
         exclude_clause = f"\n\nEXCLUDE these schools (already shown): {schools_list}"
     
     # Single AI call
@@ -177,7 +206,7 @@ def search_schools_by_location(location: str, location_type: str = "city", exclu
         prompt = f"""Extract 10-15 private schools from these search results in {location}.
 
 Search Results:
-{json.dumps(search_results, indent=2)}
+{json.dumps(search_results, indent=2)[:4000]}
 {exclude_clause}
 
 Return ONLY a valid JSON array (no markdown, no extra text):
@@ -200,32 +229,52 @@ Return ONLY a valid JSON array:
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. Provide school information."},
+                {"role": "system", "content": "You are a helpful assistant. Return only valid JSON arrays, no markdown."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.5
+            temperature=0.3,
+            timeout=30
         )
         
         content = response.choices[0].message.content
         if not content:
-            return []
+            print("[Error] Empty response")
+            return create_fallback_schools(location)
             
-        # Clean and extract JSON
-        content = content.strip()
-        if content.startswith("```"):
-            lines = content.split('\n')
-            content = '\n'.join([line for line in lines if not line.startswith("```")])
+        print(f"[AI Response] {content[:200]}...")
         
+        # More robust JSON extraction
+        content = content.strip()
+        
+        # Remove markdown code blocks
+        if content.startswith("```"):
+            content = re.sub(r'```[\w]*\n', '', content)
+            content = re.sub(r'```$', '', content)
+            content = content.strip()
+        
+        # Try to find JSON array
         json_match = re.search(r'\[[\s\S]*\]', content)
         if json_match:
-            schools = json.loads(json_match.group())
-            print(f"[Success] Found {len(schools)} schools in {location}")
-            return schools[:12]
+            try:
+                schools = json.loads(json_match.group())
+                if isinstance(schools, list) and len(schools) > 0:
+                    print(f"[Success] Found {len(schools)} schools")
+                    return schools[:15]
+                else:
+                    print("[Warning] Empty or invalid school list")
+                    return create_fallback_schools(location)
+            except json.JSONDecodeError as je:
+                print(f"[JSON Error] Could not parse: {je}")
+                return create_fallback_schools(location)
+        else:
+            print("[Error] No JSON array found in response")
+            return create_fallback_schools(location)
             
     except Exception as e:
         print(f"[Error] Search failed: {e}")
-    
-    return []
+        import traceback
+        traceback.print_exc()
+        return create_fallback_schools(location)
 
 def get_school_details(school_name: str) -> Dict:
     """Get detailed school information with comprehensive web search."""
