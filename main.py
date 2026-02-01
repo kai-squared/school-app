@@ -86,13 +86,13 @@ def web_search(keywords: List[str], max_results: int = 5) -> dict:
         return {"error": str(e)}
 
 def search_schools_by_zip(zip_code: str, miles: int = 10, exclude_schools: List[str] = []) -> List[Dict]:
-    """Quick search for schools - single AI call with web search results."""
+    """Quick search for schools - 3-tier fallback: web search → AI knowledge → generic fallback."""
     print(f"[Search] Searching schools within {miles} miles of ZIP {zip_code}, excluding {len(exclude_schools)} schools")
     
-    # Do ONE web search query
-    search_query = f"best private schools near ZIP code {zip_code} Niche ranking address"
-    
+    # Tier 1: Try web search
+    search_results = None
     try:
+        search_query = f"best private schools near ZIP code {zip_code} Niche ranking address"
         search_results = web_search([search_query], max_results=10)
         has_results = search_results and search_results.get('queries')
     except Exception as e:
@@ -101,10 +101,10 @@ def search_schools_by_zip(zip_code: str, miles: int = 10, exclude_schools: List[
     
     exclude_clause = ""
     if exclude_schools:
-        schools_list = ', '.join(exclude_schools[:10])  # Limit to avoid huge prompts
+        schools_list = ', '.join(exclude_schools[:10])
         exclude_clause = f"\n\nEXCLUDE these schools (already shown): {schools_list}"
     
-    # Single AI call to extract and structure all school data
+    # Try with web search results
     if has_results:
         prompt = f"""Extract 10-15 private schools from these search results near ZIP {zip_code}.
 
@@ -117,9 +117,31 @@ Return ONLY a valid JSON array (no markdown, no extra text):
   {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Full Address", "website": "https://...", "niche_ranking": "A+ or #1 in State", "brief_description": "1-2 sentences"}},
   ...
 ]"""
-    else:
-        # Fallback to AI knowledge
-        prompt = f"""List 10 well-known private schools near ZIP code {zip_code}.
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-5",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant. Return only valid JSON arrays, no markdown."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                timeout=30
+            )
+            
+            content = response.choices[0].message.content
+            if content:
+                schools = extract_json_array(content)
+                if schools:
+                    print(f"[Success - Web Search] Found {len(schools)} schools")
+                    return schools[:15]
+        except Exception as e:
+            print(f"[Error - Web Search Path] {e}")
+    
+    # Tier 2: Fallback to AI knowledge base (no web search)
+    print(f"[Tier 2 Fallback] Using AI knowledge base for ZIP {zip_code}")
+    try:
+        kb_prompt = f"""List 10 well-known private schools near ZIP code {zip_code} using your training data.
 {exclude_clause}
 
 Return ONLY a valid JSON array:
@@ -127,26 +149,34 @@ Return ONLY a valid JSON array:
   {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "City, State", "website": "https://...", "niche_ranking": "A+", "brief_description": "1-2 sentences"}},
   ...
 ]"""
-
-    try:
+        
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. Return only valid JSON arrays, no markdown."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": "You are a helpful assistant. Use only your training data. Return only valid JSON arrays."},
+                {"role": "user", "content": kb_prompt}
             ],
             temperature=0.3,
-            timeout=30  # 30 second timeout
+            timeout=20  # Shorter timeout for fallback
         )
         
         content = response.choices[0].message.content
-        if not content:
-            print("[Error] Empty response")
-            return create_fallback_schools(zip_code)
-            
-        print(f"[AI Response] {content[:200]}...")
-        
-        # More robust JSON extraction
+        if content:
+            schools = extract_json_array(content)
+            if schools:
+                print(f"[Success - Knowledge Base] Found {len(schools)} schools")
+                return schools[:15]
+    except Exception as e:
+        print(f"[Error - Knowledge Base Fallback] {e}")
+    
+    # Tier 3: Generic fallback message
+    print(f"[Tier 3 Fallback] Using generic fallback for {zip_code}")
+    return create_fallback_schools(zip_code)
+
+
+def extract_json_array(content: str) -> List[Dict]:
+    """Extract and parse JSON array from AI response."""
+    try:
         content = content.strip()
         
         # Remove markdown code blocks
@@ -155,29 +185,18 @@ Return ONLY a valid JSON array:
             content = re.sub(r'```$', '', content)
             content = content.strip()
         
-        # Try to find JSON array
+        # Find JSON array
         json_match = re.search(r'\[[\s\S]*\]', content)
         if json_match:
-            try:
-                schools = json.loads(json_match.group())
-                if isinstance(schools, list) and len(schools) > 0:
-                    print(f"[Success] Found {len(schools)} schools")
-                    return schools[:15]
-                else:
-                    print("[Warning] Empty or invalid school list")
-                    return create_fallback_schools(zip_code)
-            except json.JSONDecodeError as je:
-                print(f"[JSON Error] Could not parse: {je}")
-                return create_fallback_schools(zip_code)
-        else:
-            print("[Error] No JSON array found in response")
-            return create_fallback_schools(zip_code)
-            
+            schools = json.loads(json_match.group())
+            if isinstance(schools, list) and len(schools) > 0:
+                return schools
+    except json.JSONDecodeError as je:
+        print(f"[JSON Parse Error] {je}")
     except Exception as e:
-        print(f"[Error] Search failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return create_fallback_schools(zip_code)
+        print(f"[Extract Error] {e}")
+    
+    return None
 
 
 def create_fallback_schools(location: str) -> List[Dict]:
@@ -196,16 +215,17 @@ def create_fallback_schools(location: str) -> List[Dict]:
 
 
 def search_schools_by_location(location: str, location_type: str = "city", exclude_schools: List[str] = []) -> List[Dict]:
-    """Search for schools by city or state - single AI call with web search."""
+    """Search for schools by city or state - 3-tier fallback: web search → AI knowledge → generic fallback."""
     print(f"[Search] Searching for schools in {location_type}: {location}, excluding {len(exclude_schools)} schools")
     
-    # Do ONE web search query
-    if location_type == "city":
-        search_query = f"best private schools in {location} Niche ranking address"
-    else:
-        search_query = f"top private schools in {location} state Niche ranking"
-    
+    # Tier 1: Try web search
+    search_results = None
     try:
+        if location_type == "city":
+            search_query = f"best private schools in {location} Niche ranking address"
+        else:
+            search_query = f"top private schools in {location} state Niche ranking"
+        
         search_results = web_search([search_query], max_results=12)
         has_results = search_results and search_results.get('queries')
     except Exception as e:
@@ -214,10 +234,10 @@ def search_schools_by_location(location: str, location_type: str = "city", exclu
     
     exclude_clause = ""
     if exclude_schools:
-        schools_list = ', '.join(exclude_schools[:10])  # Limit to avoid huge prompts
+        schools_list = ', '.join(exclude_schools[:10])
         exclude_clause = f"\n\nEXCLUDE these schools (already shown): {schools_list}"
     
-    # Single AI call
+    # Try with web search results
     if has_results:
         prompt = f"""Extract 10-15 private schools from these search results in {location}.
 
@@ -230,9 +250,31 @@ Return ONLY a valid JSON array (no markdown, no extra text):
   {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Full Address", "website": "https://...", "niche_ranking": "A+ or #1 in State", "brief_description": "1-2 sentences"}},
   ...
 ]"""
-    else:
-        # Fallback to AI knowledge
-        prompt = f"""List 10-15 well-known private schools in {location}.
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-5",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant. Return only valid JSON arrays, no markdown."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                timeout=30
+            )
+            
+            content = response.choices[0].message.content
+            if content:
+                schools = extract_json_array(content)
+                if schools:
+                    print(f"[Success - Web Search] Found {len(schools)} schools")
+                    return schools[:15]
+        except Exception as e:
+            print(f"[Error - Web Search Path] {e}")
+    
+    # Tier 2: Fallback to AI knowledge base (no web search)
+    print(f"[Tier 2 Fallback] Using AI knowledge base for {location}")
+    try:
+        kb_prompt = f"""List 10-15 well-known private schools in {location} using your training data.
 {exclude_clause}
 
 Return ONLY a valid JSON array:
@@ -240,57 +282,29 @@ Return ONLY a valid JSON array:
   {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "City, State", "website": "https://...", "niche_ranking": "A+", "brief_description": "1-2 sentences"}},
   ...
 ]"""
-
-    try:
+        
         response = client.chat.completions.create(
             model="gpt-5",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. Return only valid JSON arrays, no markdown."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": "You are a helpful assistant. Use only your training data. Return only valid JSON arrays."},
+                {"role": "user", "content": kb_prompt}
             ],
             temperature=0.3,
-            timeout=30
+            timeout=20
         )
         
         content = response.choices[0].message.content
-        if not content:
-            print("[Error] Empty response")
-            return create_fallback_schools(location)
-            
-        print(f"[AI Response] {content[:200]}...")
-        
-        # More robust JSON extraction
-        content = content.strip()
-        
-        # Remove markdown code blocks
-        if content.startswith("```"):
-            content = re.sub(r'```[\w]*\n', '', content)
-            content = re.sub(r'```$', '', content)
-            content = content.strip()
-        
-        # Try to find JSON array
-        json_match = re.search(r'\[[\s\S]*\]', content)
-        if json_match:
-            try:
-                schools = json.loads(json_match.group())
-                if isinstance(schools, list) and len(schools) > 0:
-                    print(f"[Success] Found {len(schools)} schools")
-                    return schools[:15]
-                else:
-                    print("[Warning] Empty or invalid school list")
-                    return create_fallback_schools(location)
-            except json.JSONDecodeError as je:
-                print(f"[JSON Error] Could not parse: {je}")
-                return create_fallback_schools(location)
-        else:
-            print("[Error] No JSON array found in response")
-            return create_fallback_schools(location)
-            
+        if content:
+            schools = extract_json_array(content)
+            if schools:
+                print(f"[Success - Knowledge Base] Found {len(schools)} schools")
+                return schools[:15]
     except Exception as e:
-        print(f"[Error] Search failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return create_fallback_schools(location)
+        print(f"[Error - Knowledge Base Fallback] {e}")
+    
+    # Tier 3: Generic fallback message
+    print(f"[Tier 3 Fallback] Using generic fallback for {location}")
+    return create_fallback_schools(location)
 
 def get_school_details(school_name: str) -> Dict:
     """Get detailed school information with comprehensive web search."""
@@ -443,7 +457,7 @@ async def search_schools(request: SchoolSearchRequest):
                     "schools": []
                 }
             
-            miles = request.miles if request.miles else 10
+            miles = request.miles if request.miles else 20
             schools = search_schools_by_zip(request.query, miles, exclude_schools)
             
             # Ensure we always have valid data
