@@ -479,7 +479,7 @@ function createSchoolCard(school, expanded = false) {
                     <button class="icon-btn ${isInWatchlist ? 'added' : ''}" onclick="toggleWatchlist('${school.name.replace(/'/g, "\\'")}', ${JSON.stringify(school).replace(/"/g, '&quot;')})" title="Add to watchlist">
                         ${isInWatchlist ? '✓' : '+'}
                     </button>
-                    ${!expanded ? `<button class="icon-btn" onclick="loadSchoolDetails('${school.name.replace(/'/g, "\\'")}')">ℹ️</button>` : ''}
+                    ${!expanded ? `<button class="icon-btn" onclick="loadSchoolDetails('${school.name.replace(/'/g, "\\'")}')" title="Search School Details">ℹ️</button>` : ''}
                 </div>
             </div>
             ${school.niche_ranking ? `<div class="school-card-meta"><span class="niche-badge">🏅 ${school.niche_ranking}</span></div>` : ''}
