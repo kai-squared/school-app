@@ -126,8 +126,7 @@ Return ONLY a valid JSON array (no markdown, no extra text):
                     {"role": "system", "content": "You are a helpful assistant. Return only valid JSON arrays, no markdown."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3,
-                timeout=30
+                temperature=0.3
             )
             
             content = response.choices[0].message.content
@@ -157,8 +156,7 @@ Return ONLY a valid JSON array:
                 {"role": "system", "content": "You are a helpful assistant. Use only your training data. Return only valid JSON arrays."},
                 {"role": "user", "content": kb_prompt}
             ],
-            temperature=0.3,
-            timeout=20  # Shorter timeout for fallback
+            temperature=0.3
         )
         
         content = response.choices[0].message.content
@@ -259,8 +257,7 @@ Return ONLY a valid JSON array (no markdown, no extra text):
                     {"role": "system", "content": "You are a helpful assistant. Return only valid JSON arrays, no markdown."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3,
-                timeout=30
+                temperature=0.3
             )
             
             content = response.choices[0].message.content
