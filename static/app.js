@@ -326,6 +326,13 @@ async function performSearch() {
             body: JSON.stringify({ query, search_type: searchType, miles: miles })
         });
         
+        // Check if response is actually JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            console.error('Non-JSON response received:', contentType);
+            throw new Error('Server returned an invalid response. Please try again.');
+        }
+        
         const data = await response.json();
         
         if (!data.success) {
@@ -353,6 +360,7 @@ async function performSearch() {
         state.searchContext = JSON.stringify(data);
         
     } catch (error) {
+        console.error('Search error:', error);
         resultsContainer.innerHTML = `<div class="error">Error: ${error.message}</div>`;
     }
 }
@@ -409,6 +417,13 @@ async function loadMoreSchools() {
             })
         });
         
+        // Check if response is actually JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            console.error('Non-JSON response received:', contentType);
+            throw new Error('Server returned an invalid response. Please try again.');
+        }
+        
         const data = await response.json();
         
         if (!data.success) {
@@ -439,9 +454,9 @@ async function loadMoreSchools() {
         displaySchoolList(state.loadedSchools, locationText, distanceText);
         
     } catch (error) {
+        console.error('Load more error:', error);
         loadMoreBtn.textContent = 'Error loading more';
         loadMoreBtn.disabled = false;
-        console.error('Load more error:', error);
     }
 }
 

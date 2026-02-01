@@ -31,12 +31,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     traceback.print_exc()
     
     return JSONResponse(
-        status_code=500,
+        status_code=200,  # Return 200 to avoid default error pages
         content={
             "success": False,
-            "error": "Service temporarily unavailable. Please try again.",
+            "error": "Service temporarily unavailable. Please try again in a moment.",
             "schools": []
-        }
+        },
+        headers={"Content-Type": "application/json"}
     )
 
 # Add CORS middleware
