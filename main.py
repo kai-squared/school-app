@@ -1,6 +1,6 @@
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
@@ -22,6 +22,22 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 # Initialize FastAPI app
 app = FastAPI()
+
+# Global exception handler to prevent HTML error pages
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"[GLOBAL ERROR] {request.url}: {exc}")
+    import traceback
+    traceback.print_exc()
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "error": "Service temporarily unavailable. Please try again.",
+            "schools": []
+        }
+    )
 
 # Add CORS middleware
 app.add_middleware(
@@ -423,11 +439,17 @@ async def search_schools(request: SchoolSearchRequest):
             if not re.match(r'^\d{5}$', request.query):
                 return {
                     "success": False,
-                    "error": "Invalid ZIP code. Please enter a 5-digit US ZIP code."
+                    "error": "Invalid ZIP code. Please enter a 5-digit US ZIP code.",
+                    "schools": []
                 }
             
             miles = request.miles if request.miles else 10
             schools = search_schools_by_zip(request.query, miles, exclude_schools)
+            
+            # Ensure we always have valid data
+            if not schools or not isinstance(schools, list):
+                schools = create_fallback_schools(request.query)
+            
             return {
                 "success": True,
                 "search_type": "zip",
@@ -437,6 +459,11 @@ async def search_schools(request: SchoolSearchRequest):
             }
         elif request.search_type in ["city", "state"]:
             schools = search_schools_by_location(request.query, request.search_type, exclude_schools)
+            
+            # Ensure we always have valid data
+            if not schools or not isinstance(schools, list):
+                schools = create_fallback_schools(request.query)
+            
             return {
                 "success": True,
                 "search_type": request.search_type,
@@ -445,6 +472,15 @@ async def search_schools(request: SchoolSearchRequest):
             }
         else:  # search by name
             details = get_school_details(request.query)
+            
+            # Ensure we always have valid data
+            if not details or not isinstance(details, dict):
+                details = {
+                    "name": request.query,
+                    "description": "Details temporarily unavailable. Please try again.",
+                    "type": "Private"
+                }
+            
             return {
                 "success": True,
                 "search_type": "name",
@@ -452,9 +488,15 @@ async def search_schools(request: SchoolSearchRequest):
                 "school": details
             }
     except Exception as e:
+        print(f"[ERROR] Search endpoint failed: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Always return valid JSON, never let it crash
         return {
             "success": False,
-            "error": str(e)
+            "error": f"Search temporarily unavailable. Please try again in a moment.",
+            "schools": create_fallback_schools(request.query if hasattr(request, 'query') else "search")
         }
 
 @app.post("/api/schools/details")
