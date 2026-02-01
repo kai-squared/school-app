@@ -992,6 +992,39 @@ body {
 }
 
 /* School Cards */
+.search-results-header {
+    margin-bottom: 24px;
+}
+
+.search-results-header h3 {
+    font-size: 20px;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.search-results-header p {
+    font-size: 14px;
+    color: #666;
+}
+
+.load-more-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 32px;
+    margin-bottom: 24px;
+}
+
+.load-more-container .primary-btn {
+    padding: 14px 36px;
+    font-size: 15px;
+    min-width: 200px;
+}
+
+.load-more-container .primary-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .school-card {
     background: rgba(102, 126, 234, 0.05);
     border: 2px solid rgba(102, 126, 234, 0.15);
@@ -1046,6 +1079,16 @@ body {
 .school-card-meta a:hover {
     color: #764ba2;
     text-decoration: underline;
+}
+
+.niche-badge {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 12px;
+    display: inline-block;
 }
 
 .school-card-actions {

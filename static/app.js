@@ -10,7 +10,12 @@ const state = {
     currentQuestionIndex: 0,
     mediaRecorder: null,
     recordingChunks: [],
-    recordingStartTime: null
+    recordingStartTime: null,
+    currentSearchQuery: null,
+    currentSearchType: null,
+    currentMiles: 10,
+    loadedSchools: [],
+    allSchoolsLoaded: false
 };
 
 // Initialize app
@@ -272,9 +277,9 @@ function setupSearchSection() {
 function updatePlaceholder(searchType) {
     const searchInput = document.getElementById('schoolSearchInput');
     const placeholders = {
-        zip: 'Enter ZIP code (e.g., 30096)',
-        city: 'Enter city name (e.g., Atlanta)',
-        state: 'Enter state name (e.g., Georgia)',
+        zip: 'Enter ZIP code (e.g., 10001)',
+        city: 'Enter city name (e.g., New York)',
+        state: 'Enter state name (e.g., New York)',
         name: 'Enter school name (e.g., Phillips Academy)'
     };
     searchInput.placeholder = placeholders[searchType] || 'Enter search query';
@@ -307,6 +312,13 @@ async function performSearch() {
     const miles = (searchType === 'zip' || searchType === 'city') ? 
         parseInt(document.getElementById('milesSlider').value) : 10;
     
+    // Reset state for new search
+    state.currentSearchQuery = query;
+    state.currentSearchType = searchType;
+    state.currentMiles = miles;
+    state.loadedSchools = [];
+    state.allSchoolsLoaded = false;
+    
     try {
         const response = await fetch(`${API_BASE_URL}/api/schools/search`, {
             method: 'POST',
@@ -330,7 +342,10 @@ async function performSearch() {
                                `${query} state`;
             const distanceText = (searchType === 'zip' || searchType === 'city') ? 
                                ` within ${displayMiles} miles` : '';
-            displaySchoolList(data.schools, locationText, distanceText);
+            
+            // Save loaded schools
+            state.loadedSchools = data.schools || [];
+            displaySchoolList(state.loadedSchools, locationText, distanceText);
         }
         
         // Show chat section
@@ -352,15 +367,82 @@ function displaySchoolList(schools, location, distanceText) {
         return;
     }
     
+    const loadMoreButton = !state.allSchoolsLoaded ? `
+        <div class="load-more-container">
+            <button id="loadMoreBtn" class="primary-btn" onclick="loadMoreSchools()">
+                Load More Schools
+            </button>
+        </div>
+    ` : '';
+    
     const html = `
         <div class="search-results-header">
             <h3>Schools in ${location}${distanceText}</h3>
-            <p>${schools.length} schools found</p>
+            <p>${schools.length} schools loaded</p>
         </div>
         ${schools.map(school => createSchoolCard(school, false)).join('')}
+        ${loadMoreButton}
     `;
     
     resultsContainer.innerHTML = html;
+}
+
+async function loadMoreSchools() {
+    const loadMoreBtn = document.getElementById('loadMoreBtn');
+    if (!loadMoreBtn) return;
+    
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = 'Loading...';
+    
+    try {
+        // Get list of already loaded school names to exclude
+        const excludeSchools = state.loadedSchools.map(s => s.name);
+        
+        const response = await fetch(`${API_BASE_URL}/api/schools/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                query: state.currentSearchQuery, 
+                search_type: state.currentSearchType, 
+                miles: state.currentMiles,
+                exclude_schools: excludeSchools
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to load more schools');
+        }
+        
+        const newSchools = data.schools || [];
+        
+        if (newSchools.length === 0) {
+            state.allSchoolsLoaded = true;
+            loadMoreBtn.textContent = 'No more schools found';
+            setTimeout(() => {
+                loadMoreBtn.style.display = 'none';
+            }, 2000);
+            return;
+        }
+        
+        // Add new schools to loaded list
+        state.loadedSchools = [...state.loadedSchools, ...newSchools];
+        
+        // Re-render the list
+        const locationText = state.currentSearchType === 'zip' ? `ZIP ${state.currentSearchQuery}` : 
+                           state.currentSearchType === 'city' ? `${state.currentSearchQuery}` : 
+                           `${state.currentSearchQuery} state`;
+        const distanceText = (state.currentSearchType === 'zip' || state.currentSearchType === 'city') ? 
+                           ` within ${state.currentMiles} miles` : '';
+        
+        displaySchoolList(state.loadedSchools, locationText, distanceText);
+        
+    } catch (error) {
+        loadMoreBtn.textContent = 'Error loading more';
+        loadMoreBtn.disabled = false;
+        console.error('Load more error:', error);
+    }
 }
 
 function displaySchoolDetails(school) {
@@ -385,6 +467,7 @@ function createSchoolCard(school, expanded = false) {
                     ${!expanded ? `<button class="icon-btn" onclick="loadSchoolDetails('${school.name.replace(/'/g, "\\'")}')">ℹ️</button>` : ''}
                 </div>
             </div>
+            ${school.niche_ranking ? `<div class="school-card-meta"><span class="niche-badge">🏅 ${school.niche_ranking}</span></div>` : ''}
             ${school.address ? `<div class="school-card-meta">📍 ${school.address}</div>` : ''}
             ${school.website ? `<div class="school-card-meta">🌐 <a href="${school.website}" target="_blank" onclick="event.stopPropagation()">${school.website}</a></div>` : ''}
             <div class="school-card-description">${school.brief_description || school.description || ''}</div>

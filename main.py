@@ -68,9 +68,9 @@ def web_search(keywords: List[str], max_results: int = 5) -> dict:
     except requests.exceptions.RequestException as e:
         return {"error": str(e)}
 
-def search_schools_by_zip(zip_code: str, miles: int = 10) -> List[Dict]:
+def search_schools_by_zip(zip_code: str, miles: int = 10, exclude_schools: List[str] = []) -> List[Dict]:
     """Quick search for schools - tries web search first, falls back to AI knowledge."""
-    print(f"[Search] Quick search for schools within {miles} miles of ZIP {zip_code}")
+    print(f"[Search] Quick search for schools within {miles} miles of ZIP {zip_code}, excluding {len(exclude_schools)} schools")
     
     search_query = f"private schools near {zip_code} within {miles} miles"
     
@@ -83,28 +83,34 @@ def search_schools_by_zip(zip_code: str, miles: int = 10) -> List[Dict]:
     except Exception as e:
         print(f"[Web Search] Failed: {e}")
     
+    exclude_clause = ""
+    if exclude_schools:
+        exclude_clause = f"\n\nIMPORTANT: Do NOT include these schools that were already shown: {', '.join(exclude_schools)}"
+    
     # Build prompt based on whether we have search results
     if search_results and search_results.get('queries'):
         prompt = f"""Based on these search results, extract private schools near ZIP code {zip_code}.
 
 Search results:
 {json.dumps(search_results, indent=2)}
+{exclude_clause}
 
-Return a JSON array with 8-10 schools. Include address and website if available:
+Return a JSON array with 8-10 NEW schools (different from excluded list). Include address, website, and Niche ranking if available:
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "brief_description": "One sentence"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "brief_description": "One sentence"}}
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "niche_ranking": "#5 in State", "brief_description": "One sentence"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "niche_ranking": "#10 in State", "brief_description": "One sentence"}}
 ]
 
 Return valid JSON only."""
     else:
         # Fallback to AI's training data
         prompt = f"""Using your training data, list 8-10 well-known private schools typically within {miles} miles of ZIP code {zip_code}.
+{exclude_clause}
 
-Return a JSON array with address and website:
+Return a JSON array with NEW schools (different from excluded list), including address, website, and Niche ranking:
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "brief_description": "One sentence about the school"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "brief_description": "One sentence"}}
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "niche_ranking": "#5 in State", "brief_description": "One sentence about the school"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "niche_ranking": "#10 in State", "brief_description": "One sentence"}}
 ]
 
 Return valid JSON only."""
@@ -147,9 +153,9 @@ Return valid JSON only."""
     return []
 
 
-def search_schools_by_location(location: str, location_type: str = "city") -> List[Dict]:
+def search_schools_by_location(location: str, location_type: str = "city", exclude_schools: List[str] = []) -> List[Dict]:
     """Search for schools by city or state."""
-    print(f"[Search] Searching for schools in {location_type}: {location}")
+    print(f"[Search] Searching for schools in {location_type}: {location}, excluding {len(exclude_schools)} schools")
     
     search_query = f"private schools in {location}" if location_type == "city" else f"top private schools in {location} state"
     
@@ -162,28 +168,34 @@ def search_schools_by_location(location: str, location_type: str = "city") -> Li
     except Exception as e:
         print(f"[Web Search] Failed: {e}")
     
+    exclude_clause = ""
+    if exclude_schools:
+        exclude_clause = f"\n\nIMPORTANT: Do NOT include these schools that were already shown: {', '.join(exclude_schools)}"
+    
     # Build prompt
     if search_results and search_results.get('queries'):
         prompt = f"""Based on these search results, extract a list of private schools in {location}.
 
 Search results:
 {json.dumps(search_results, indent=2)}
+{exclude_clause}
 
-Return a JSON array with 8-12 schools. Include address and website if available:
+Return a JSON array with 8-12 NEW schools (different from excluded list). Include address, website, and Niche ranking if available:
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "brief_description": "One sentence"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "brief_description": "One sentence"}}
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "niche_ranking": "#5 in State", "brief_description": "One sentence"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "niche_ranking": "#10 in State", "brief_description": "One sentence"}}
 ]
 
 Return valid JSON only."""
     else:
         # Fallback to AI knowledge
         prompt = f"""Using your training data, list 8-12 well-known private schools in {location}.
+{exclude_clause}
 
-Return a JSON array with address and website:
+Return a JSON array with NEW schools (different from excluded list), including address, website, and Niche ranking:
 [
-  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "brief_description": "One sentence about the school"}},
-  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "brief_description": "One sentence"}}
+  {{"name": "School Name", "type": "Private", "grade_range": "K-12", "address": "Street, City, State ZIP", "website": "https://example.com", "niche_ranking": "#5 in State", "brief_description": "One sentence about the school"}},
+  {{"name": "Another School", "type": "Private", "grade_range": "6-12", "address": "Address", "website": "https://example.com", "niche_ranking": "#10 in State", "brief_description": "One sentence"}}
 ]
 
 Return valid JSON only."""
@@ -327,6 +339,7 @@ class SchoolSearchRequest(BaseModel):
     query: str
     search_type: str  # "zip", "city", "state", or "name"
     miles: Optional[int] = 10  # default 10 miles for ZIP/city search
+    exclude_schools: Optional[List[str]] = []  # list of school names to exclude
 
 class SchoolDetailsRequest(BaseModel):
     school_name: str
@@ -363,6 +376,8 @@ async def root():
 async def search_schools(request: SchoolSearchRequest):
     """Search for schools by ZIP code, city, state, or name."""
     try:
+        exclude_schools = request.exclude_schools or []
+        
         if request.search_type == "zip":
             # Validate ZIP code format
             if not re.match(r'^\d{5}$', request.query):
@@ -372,7 +387,7 @@ async def search_schools(request: SchoolSearchRequest):
                 }
             
             miles = request.miles if request.miles else 10
-            schools = search_schools_by_zip(request.query, miles)
+            schools = search_schools_by_zip(request.query, miles, exclude_schools)
             return {
                 "success": True,
                 "search_type": "zip",
@@ -381,7 +396,7 @@ async def search_schools(request: SchoolSearchRequest):
                 "schools": schools
             }
         elif request.search_type in ["city", "state"]:
-            schools = search_schools_by_location(request.query, request.search_type)
+            schools = search_schools_by_location(request.query, request.search_type, exclude_schools)
             return {
                 "success": True,
                 "search_type": request.search_type,
